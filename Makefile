@@ -9,10 +9,10 @@ LDFLAGS=
 #    
 #                                  
 
-SOURCES=test.c bloom.c
+SOURCES=main.c lex.c nfa.c dfa.c gen.c
 OBJECTS=$(SOURCES:.c=.o)
 
-EXECUTABLE=test
+EXECUTABLE=plex
 
 all: $(SOURCES)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SOURCES) -o $(EXECUTABLE) 
