@@ -55,6 +55,13 @@ int   textutils_getline(char **dest, int n, FILE *stream);
 #define STREMPTY(s) (STRCMP((s),""))
 
 
+#define IS_HEXDIGIT(x) (isdigit(x)||('a'<=(x)&&(x)<='f')||('A'<=(x)&&(x)<='F'))
+#define IS_OCTDIGIT(x) ('0'<=(x) && (x)<='7')
+int hex2bin(int c);
+int oct2bin(int c);
+int esc(char **s);
+
+
 /**
  * concat
  * ``````

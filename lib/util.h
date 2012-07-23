@@ -109,7 +109,7 @@ extern int __build_bug_on_failed;
  */
 #define VARIABLE(v) { enum v { }; }
 
-#define ASSIGN(variable, value) \
+#define V_ASSIGN(variable, value) \
         VARIABLE(variable) \
         { enum { E = value }; } \
         variable = value;
@@ -338,6 +338,16 @@ extern int __build_bug_on_failed;
 /******************************************************************************
  * END LINUX KERNEL NOVELTIES
  ******************************************************************************/
+/******************************************************************************
+ * Things I took from Alan Holub's Compiler Design in C 
+ ******************************************************************************/
+#define TOOHIGH(a, p) ((p) - (a) > (ARRAY_SIZE(a) - 1))
+#define TOOLOW(a, p)  ((p) - (a) < 0)
+#define INBOUNDS(a, p) (!(TOOHIGH(a,p) || TOOLOW(a,p)))
+/* Largest int available on a machine */
+#define LARGEST_INT (int)(((unsigned)(~0)) >> 1)
+
+
 /******************************************************************************
  * BEGIN MISCELLANEOUS MONSTROSITIES
  ******************************************************************************/

@@ -3,7 +3,7 @@
 
 
 /* One cell in the bitmap */
-unsigned short _SETTYPE; 
+typedef unsigned short _SETTYPE; 
 
 
 #define _BITS_IN_WORD      (16)

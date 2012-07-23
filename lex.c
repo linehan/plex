@@ -5,16 +5,51 @@
 
 #include "lib/textutils.h"
 #include "lib/error.h"
+#include "lib/set.h"
 #include "nfa.h"
 #include "main.h"
+#include "lex.h"
 
-/*
- * Lexical analyzer.
- */
+
+FILE *Input;
 enum token Token;
 char *Current;
 char *Start;
-char *Lexeme;
+int   Lexeme;
+
+
+/*
+ * machine (entry)
+ * ```````
+ * Build the NFA state machine.
+ */
+struct nfa_t *machine(FILE *input)
+{
+        struct nfa_t *start;
+        struct nfa_t *p;
+
+        if (input)
+                Input = input;
+        else
+                halt(SIGABRT, "Bad input file.\n");
+
+        p = start = new_nfa();
+        p->next   = rule();
+
+        while (Token != END_OF_INPUT) {
+                p->next2 = new_nfa();
+                p        = p->next2;
+                p->next  = rule();
+        }
+
+        return start;
+}
+
+
+
+/******************************************************************************
+ * Lexical analyzer.
+ ******************************************************************************/
 
 
 enum token advance(void)
@@ -39,7 +74,7 @@ enum token advance(void)
                  * Loop until a non-blank line is read. 
                  */
 	        do {
-	                if (!(Current = getline(&Current, MAXLINE, pgen->in))) {
+	                if (!(Current = getline(&Current, MAXLINE, Input))) {
 		                Token = END_OF_INPUT;
 		                goto exit;
                         }
@@ -119,9 +154,9 @@ enum token advance(void)
 }
 
 
-/*
- * The parser
- * ``````````
+/******************************************************************************
+ * Parser
+ * ``````
  * The following components implement a recursive descent parser which
  * produces a non-finite automaton for a regular expression using 
  * Thompson's construction. 
@@ -132,38 +167,13 @@ enum token advance(void)
  *
  * The parser descends through 
  *
- *      machine()
  *      rule()
  *      expr()
  *      factor()
  *      term()
  *      dodash()
- * 
- */
-
-
-/*
- * machine
- * ```````
- * Build the NFA
- */
-struct nfa_t *machine(void)
-{
-        struct nfa_t *start;
-        struct nfa_t *p;
-
-        p = start = new_nfa();
-        p->next   = rule();
-
-        while (Token != END_OF_INPUT) {
-                p->next2 = new_nfa();
-                p        = p->next2;
-                p->next  = rule();
-        }
-
-        return start;
-}
-
+ *
+ ******************************************************************************/
 
 /**
  * rule
@@ -183,7 +193,7 @@ struct nfa_t *rule(void)
         struct nfa_t *end   = NULL;
         int anchor = NONE;
 
-        if (MATCH(AT_BOL)) {
+        if (Token == AT_BOL) {
     	        start 	     =  new_nfa();
 	        start->edge  =  '\n';
 	        anchor      |= START;
@@ -197,12 +207,12 @@ struct nfa_t *rule(void)
          * Pattern followed by a carriage-return or linefeed
          * (use a character class).
          */
-        if (MATCH(AT_EOL)) {
+        if (Token == AT_EOL) {
                 advance();
                 end->next = new_nfa();
                 end->edge = CCL;
 
-                if (!(end->bitset = newset()))
+                if (!(end->bitset = new_set()))
                         halt(SIGABRT, "Out of memory.");
 
                 ADD(end->bitset, '\n');
@@ -211,10 +221,10 @@ struct nfa_t *rule(void)
                 anchor |= END;
         }
 
-        while (isspace(*input))
-	        input++;
+        while (isspace(*Current))
+	        Input++;
 
-        end->accept = save(input);
+        end->accept = save(Current);
         end->anchor = anchor;
         advance(); // Skip past EOS
 
@@ -253,7 +263,7 @@ void expr(struct nfa_t **startp, struct nfa_t **endp)
 
         cat_expr(startp, endp);
 
-        while(MATCH(OR)) {
+        while(Token == OR) {
 	        advance();
 	        cat_expr(&e2_start, &e2_end);
 
@@ -345,18 +355,18 @@ void factor(struct nfa_t **startp, struct nfa_t **endp)
 
         term(startp, endp);
 
-        if (MATCH(CLOSURE) || MATCH(PLUS_CLOSE) || MATCH(OPTIONAL)) {
+        if (Token == CLOSURE || Token == PLUS_CLOSE || Token == OPTIONAL) {
 	        start = new_nfa();
 	        end   = new_nfa();
 	        start->next = *startp;
 	        (*endp)->next = end;
 
                 // * or ?
-                if (MATCH(CLOSURE) || MATCH(OPTIONAL))
+                if (Token == CLOSURE || Token == OPTIONAL)
                         start->next2 = end;
 
                 // * or + 
-                if (MATCH(CLOSURE) || MATCH(PLUS_CLOSE))
+                if (Token == CLOSURE || Token == PLUS_CLOSE)
                         (*endp)->next2 = *startp;
 
                 *startp  = start;
@@ -379,10 +389,10 @@ void term(struct nfa_t **startp, struct nfa_t **endp)
         struct nfa_t *start;
         int c;
 
-        if (MATCH(OPEN_PAREN)) {
+        if (Token == OPEN_PAREN) {
 	        advance();
 	        expr(startp, endp);
-	        if (MATCH(CLOSE_PAREN))
+	        if (Token == CLOSE_PAREN)
 	                advance();
 	        else
 	                halt(SIGABRT, "Parenthesis are rotten.");	
@@ -390,39 +400,33 @@ void term(struct nfa_t **startp, struct nfa_t **endp)
 	        *startp = start = new_nfa();
 	        *endp   = start->next = new_nfa();
 
-                if (!(MATCH(ANY) || MATCH(CCL_START))) {
+                if (!(Token == ANY || Token == CCL_START)) {
                         start->edge = Lexeme;
                         advance();
                 } else {
                         start->edge = CCL;
 
-                        if (!(start->bitset = newset()))
+                        if (!(start->bitset = new_set()))
                                 halt(SIGABRT, "Out of memory.");	
 
                         /* dot (.) */
-                        if (MATCH(ANY))	{
+                        if (Token == ANY)	{
                                 ADD(start->bitset, '\n');
-
-                                if(!Unix)
-                                    ADD(start->bitset, '\r');
 
                                 COMPLEMENT(start->bitset);
                         } else {
                                 advance();
                                 /* Negative character class */
-                                if (MATCH(AT_BOL)) {
+                                if (Token == AT_BOL) {
                                         advance();
 
                                         /* Don't include \n in class */
                                         ADD(start->bitset, '\n');
 
-                                        if (!Unix)
-                                                ADD(start->bitset, '\r');
-
                                         COMPLEMENT(start->bitset);
                                 }
 
-                                if (!MATCH(CCL_END)) {
+                                if (Token != CCL_END) {
                                         dodash(start->bitset);
                                 } else { // [] or [^]
                                         for (c=0; c<=' '; ++c)
@@ -441,20 +445,20 @@ void dodash(struct set_t *set)
         register int first;
 
         /* Treat [-...] as a literal dash, but print a warning. */
-        if (MATCH(DASH)) {		
+        if (Token == DASH) {		
 	        ADD(set, Lexeme);
 	        advance();
         }
 
-        for (; !MATCH(EOS) && !MATCH(CCL_END); advance()) {
-	        if (!MATCH(DASH)) {
+        for (; Token != EOS && Token != CCL_END; advance()) {
+	        if (Token != DASH) {
 	                first = Lexeme;
 	                ADD(set, Lexeme);
                 /* Looking at a dash */
 	        } else {
 	                advance();
                         /* Treat [...-] as literal */
-	                if (MATCH(CCL_END)) {
+	                if (Token == CCL_END) {
 		                ADD(set, '-');
 	                } else {
 		                for (; first<=Lexeme; first++)

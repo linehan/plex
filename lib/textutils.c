@@ -754,3 +754,142 @@ char *get_expr(FILE *fd_input)
 }
 
 
+
+/**
+ * hex2bin
+ * ```````
+ * Convert the hexadecimal digit to an int.
+ *
+ * @c: hexadecimal digit
+ *
+ * NOTE
+ * @c must be one of 0123456789abcdefABCDEF
+ */
+int hex2bin(int c)
+{
+        return (isdigit(c)) ? ((c)-'0') : ((((toupper(c))-'A')+10) & 0xf);
+}
+
+/**
+ * oct2bin
+ * ```````
+ * Convert the octal digit represented by 'c' to an int.
+ *
+ * @c: octal digit
+ *
+ * NOTE
+ * @c must be one of 01234567
+ */
+int oct2bin(int c)
+{
+        return (((c)-'0') & 0x7);
+}
+
+
+/**
+ * esc
+ * ```
+ * Return the character associated with the escape sequence pointed to
+ * by *s, and modify *s to point past the sequence.
+ * 
+ * @s: Pointer to a string holding escape sequence
+ *
+ * HISTORY
+ * From Alan Holub's "Compiler Design in C"
+ * 
+ * NOTES
+ * Recognized characters:
+ *
+ *      \b      backspace
+ *      \f      formfeed
+ *      \n      newline
+ *      \r      carriage return
+ *      \s      space
+ *      \t      tab
+ *      \e      ASCII ESC character ('\033')
+ *      \DDD    number formed of 1-3 octal digits
+ *      \xDDD   number formed of 1-3 hex digits (two required)
+ *      \^C     C = any letter. Control code.
+ */
+int esc(char **s)
+{
+        register int rval;
+
+        if (**s != '\\')
+                rval = *((*s)++);
+        else {
+                ++(*s);
+                switch (toupper(**s))
+                {
+                case '\0': 
+                        rval = '\\';
+                        break;
+                case 'B':
+                        rval = '\b';
+                        break;
+                case 'F':
+                        rval = '\f';
+                        break;
+                case 'N':
+                        rval = '\n';
+                        break;
+                case 'R':
+                        rval = 'r';
+                        break;
+                case 'S':
+                        rval = ' ';
+                        break;
+                case 'T':
+                        rval = '\t';
+                        break;
+                case 'E':
+                        rval = '\033';
+                        break;
+                case '^':
+                        rval = *++(*s);
+                        rval = toupper(rval) - '@';
+                        break;
+                case 'X':
+                        rval = 0;
+                        ++(*s);
+                        if (IS_HEXDIGIT(**s)) {
+                                rval = hex2bin(*(*s)++);
+                        }
+                        if (IS_HEXDIGIT(**s)) {
+                                rval <<= 4;
+                                rval  |= hex2bin(*(*s)++);
+                        }
+                        if (IS_HEXDIGIT(**s)) {
+                                rval << 4;
+                                rval  |= hex2bin(*(*s)++);
+                        }
+                        --(*s);
+                        break;
+
+                default:
+                        if (!IS_OCTDIGIT(**s))
+                                rval = **s;
+                        else {
+                                ++(*s);
+                                rval = oct2bin(*(*s)++);
+                                if (IS_OCTDIGIT(**s)) {
+                                        rval <<= 3;
+                                        rval  |= oct2bin(*(*s)++);
+                                }
+                                if (IS_OCTDIGIT(**s)) {
+                                        rval <<= 3;
+                                        rval  |= oct2bin(*(*s)++);
+                                }
+                                --(*s);
+                        }
+                        break;
+                }
+                ++(*s);
+        }
+        return rval;
+}
+        
+
+
+
+

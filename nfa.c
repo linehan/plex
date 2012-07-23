@@ -1,17 +1,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "common/error.h"
+#include <stdbool.h>
+#include "lib/error.h"
 
 #include "nfa.h"
+#include "lex.h"
 
 
 /* True if stack isn't full or empty. */
-#define	STACK_OK()    (INBOUNDS(nfa_stack, nfa_stack_ptr)) 
-#define STACK_USED()  ((int)(nfa_stack_ptr-nfa_stack) + 1) // Number of slots used 
-#define CLEAR_STACK() (nfa_stack_ptr = nfa_stack - 1)      // Reset the stack 
-#define PUSH(x)	      (*++nfa_stack_ptr = (x))             // push x to the stack
-#define POP()	      (*nfa_stack_ptr--)                   // pop x from stack 
+#define	STACK_OK()    (INBOUNDS(STACK, STACKP)) 
+#define STACK_USED()  ((int)(STACKP-STACK) + 1) // Number of slots used 
+#define CLEAR_STACK() (STACKP = STACK - 1)      // Reset the stack 
+#define PUSH(x)	      (*++STACKP = (x))             // push x to the stack
+#define POP()	      (*STACKP--)                   // pop x from stack 
 
 #define	MATCH(t) (cur_tok == (t))
 #define	SSIZE	32 // State size
@@ -21,6 +23,8 @@ char *cur_input;      // Current position in input string.
 char *beg_input;      // Beginning of input string
 enum  token cur_tok;  // Current token
 int   lexeme;         // Value associated with LITERAL
+
+int LINENO=0;
 
 struct nfa_t  *STACK[SSIZE];        // Stack used by new() 
 struct nfa_t **STACKP = &STACK[-1]; // Stack pointer 
@@ -43,10 +47,10 @@ struct nfa_t **STACKP = &STACK[-1]; // Stack pointer
  * contain the maximum number of states. Subsequent calls simply return
  * a pointer to a region of this memory block.
  */
-struct nfa_t *new_nfa(struct pgen_t *pgen)
+struct nfa_t *new_nfa(void)
 {
         static bool init = false;
-        struct nfa_node *new;
+        struct nfa_t *new;
 
         if (!init) {
 
@@ -85,7 +89,7 @@ void del_nfa(struct nfa_t *doomed)
 {
         --nfa_nstates;
 
-        memset(doomed, 0, sizeof(NFA));
+        memset(doomed, 0, sizeof(struct nfa_t));
         doomed->edge = EMPTY ;
         PUSH(doomed);
 
@@ -168,19 +172,19 @@ char *save(char *str)
  * @max_state  : the maximum number of states, modified to reflect largest used.
  * @start_state: modified to be the start state
  */
-struct nfa_t *thompson(int *max_state, struct nfa_t **start_state)
+struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state)
 {
         CLEAR_STACK();
 
         /* Load first token */
-        cur_token = EOS;
+        cur_tok = EOS;
         advance();
 
         nfa_nstates = 0;
         nfa_next    = 0;
 
-        *start_state = machine(); // Manufacture the NFA
-        *max_state   = nfa_next;  // Max state # in NFA
+        *start_state = machine(input); // Manufacture the NFA
+        *max_state   = nfa_next;       // Max state # in NFA
 
         return nfa_state;
 }
@@ -199,7 +203,7 @@ int nfa(FILE *input)
 {
     struct nfa_t *sstate;
 
-    nfa_state = thompson(&nfa_nstates, &sstate);
+    nfa_state = thompson(input, &nfa_nstates, &sstate);
     return (sstate - nfa_state);
 }
 
@@ -234,13 +238,13 @@ void free_nfa(void)
  * accepting string if one of the elements of the output state is an
  * accepting state.
  */
-SET *e_closure(SET *input, char **accept, int *anchor)
+struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
 {
         int  stack[NFA_MAX]; // Stack of untested states
         int  *tos;           // Stack pointer
-        NFA  *p;             // NFA state being examined	
+        struct nfa_t *p;     // NFA state being examined	
         int  i;              // State number of "	
-        int  accept_num = LARGEST_INT ;
+        int  accept_num = LARGEST_INT;
 
         if (!input)
 	        goto abort;
@@ -315,10 +319,10 @@ SET *e_closure(SET *input, char **accept, int *anchor)
  * @inp_set: input set
  * @c      : transition on this character.
  */
-SET *move(SET *inp_set, int c)
+struct set_t *move(struct set_t *inp_set, int c)
 {
-        SET *outset = NULL; // Output set
-        NFA *p;             // Current NFA state
+        struct set_t *outset = NULL; // Output set
+        struct nfa_t *p;             // Current NFA state
         int i;
 
         for (i = nfa_states; --i >= 0;) {
@@ -327,7 +331,7 @@ SET *move(SET *inp_set, int c)
 
                         if (p->edge==c || (p->edge==CCL && TEST(p->bitset, c))) {
                                 if(!outset)
-                                        outset = newset();
+                                        outset = new_set();
 
                                 ADD(outset, p->next - nfa_state);
                         }
@@ -335,22 +339,5 @@ SET *move(SET *inp_set, int c)
         }
         return(outset);
 }
-
-
-
-
-
-#ifdef MAIN
-
-void main(int argc, char **argv)
-{
-        struct nfa_t *nfa;
-        struct nfa_t *start_state;
-        int max_state;
-
-        nfa = thompson(getline, &max_state, &start_state);
-}
-
-#endif
 
 

@@ -1,6 +1,8 @@
 #ifndef _LEXER_H
 #define _LEXER_H
 
+#include "lib/set.h"
+
 
 enum token {
         EOS = 1,      // end of string
@@ -24,8 +26,8 @@ enum token {
 
 
 
+struct nfa_t *machine(FILE *input);
 enum token    advance(void);
-struct nfa_t *machine(void);
 struct nfa_t    *rule(void);
 
 void        expr(struct nfa_t **startp, struct nfa_t **endp);
@@ -38,11 +40,11 @@ void dodash(struct set_t *set);
 
 
 
-enum token TOKEN_MAP[] = {
+static enum token TOKEN_MAP[] = {
 //  ^@  ^A  ^B  ^C  ^D  ^E  ^F  ^G  ^H  ^I  ^J  ^K  ^L  ^M  ^N	
-     L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,
+    L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,
 //  ^O  ^P  ^Q  ^R  ^S  ^T  ^U  ^V  ^W  ^X  ^Y  ^Z  ^[  ^\  ^]	
-     L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,
+    L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,
 //  ^^  ^_  SPACE  !   "   #    $        %   &    '		
     L,  L,  L,     L,  L,  L,   AT_EOL,  L,  L,   L,
 //  (		 )            *	       +           ,  -     .   

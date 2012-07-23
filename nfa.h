@@ -1,18 +1,20 @@
 #ifndef _NFA_H 
 #define _NFA_H 
 
+#include "lib/set.h"
+
 /*
  * An nfa_t is the non-deterministic finite automaton (NFA) produced
  * in the Thompson construction.
  */
 
 struct nfa_t {
-        int   edge;          // Edge label: char, CCL, EMPTY, or EPSILON.
-        char *bitset;        // Set to store character class.
-        struct nfa_t *next;  // Next state (NULL if no next state).
-        struct nfa_t *next2; // Another next state if edge == EPSILON.
-        char *accept;        // NULL if !accepting state, else the action.
-        int   anchor;        // Says whether pattern is anchored and where.
+        int   edge;           // Edge label: char, CCL, EMPTY, or EPSILON.
+        struct set_t *bitset; // Set to store character class.
+        struct nfa_t *next;   // Next state (NULL if no next state).
+        struct nfa_t *next2;  // Another next state if edge == EPSILON.
+        char *accept;         // NULL if !accepting state, else the action.
+        int   anchor;         // Says whether pattern is anchored and where.
 };
 
 
@@ -43,7 +45,11 @@ int nfa_next;            // Index of next element in the array.
 #define STR_MAX (10 * 1024)     
 
 
-struct nfa_t *thompson(int *max_state, struct nfa_t **start_state);
+struct nfa_t *new_nfa(void);
+void          del_nfa(struct nfa_t *doomed);
+
+struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state);
+
 
 #endif
 

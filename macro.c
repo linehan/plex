@@ -2,8 +2,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "lib/hash.h"
 #include "nfa.h"
 #include "macro.h"
+
 
 struct htab_t *MACROTABLE; /* Symbol table for macro definitions */
 
@@ -29,7 +31,7 @@ void new_macro(char *def)
 
         if (first) {
 	        first = 0;
-	        MACROTABLE = maketab(31, hash_add, strcmp);
+	        MACROTABLE = new_htab(31, sdbm_hash, strcmp);
         }
 
         /* Isolate name */
@@ -65,10 +67,10 @@ void new_macro(char *def)
 	        *edef = '\0';
 	
         /* Add the macro to the symbol table  */
-        p  = (struct macro_t *)newsym(sizeof(struct macro_t));
+        p  = (struct macro_t *)new_symbol(sizeof(struct macro_t));
         slcpy(p->name, name, MAC_NAME_MAX);
         slcpy(p->text, text, MAC_TEXT_MAX);
-        addsym(MACROTABLE, p);
+        add_symbol(MACROTABLE, p);
 }
 
 
