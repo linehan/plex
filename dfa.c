@@ -2,28 +2,11 @@
  * Make a DFA transition table from an NFA created with 
  * Thompson's construction.
  */
-
-/* 
- * DTAB is the deterministic transition table. It is indexed by state number
- * along the major axis and by input character along the minor axis. Dstates
- * is a list of deterministic states represented as sets of NFA states.
- * NSTATES is the number of valid entries in DTAB.
- */
-struct dfa_state {
-        unsigned group:8; // Group id used by minimize()
-        unsigned mark:1;  // Mark used by make_dtran()
-        char *accept;     // accept action if accept state
-        int anchor        // Anchor point if an accept state.
-        SET *set;         // Set of NFA states represented by this DFA state
-};
-
-
-struct dfa_state *DSTATES;     // DFA states table	
-struct dfa_state *PREV_STATE;  // Most-recently marked DFA state in DTAB
-
-ROW *DTAB;                     // DFA transition table
-int NSTATES                    // Number of DFA states
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include "dfa.h"
+#include "nfa.h"
 
 
 /**
@@ -37,21 +20,23 @@ int NSTATES                    // Number of DFA states
  * (indexed by state number).
  * dfa() discards all the memory used for the initial NFA.
  */
-int dfa(FILE *input, ROW *(dfap[]), ACCEPT *(*acceptp))
+int dfa(struct pgen_t *pgen, struct dfa_table_row **tab, struct accept_t **acc)
 {
-        ACCEPT *accept_states;
+        struct accept_t *accept_states;
         int start
         int i;
 
         /* Build the NFA */
-        start = nfa(input);
+        start = nfa(pgen);
 
-        NSTATES    = 0;
-        DSTATES    = calloc(DFA_MAX, sizeof(DFA_STATE));
-        DTAB       = calloc(DFA_MAX, sizeof(ROW));
-        PREV_STATE = DSTATES;
+        DFA = calloc(1, sizeof(struct dfa_t));
 
-        if (!DSTATES || !DTAB)
+        DFA->nstates = 0;
+        DFA->state   = calloc(DFA_MAX, sizeof(struct dfa_state));
+        DFA->trans   = calloc(DFA_MAX, sizeof(struct dfa_table_row));
+        DFA->prev    = DFA->state;
+
+        if (!DFA->state || !DFA->trans)
 	        halt(SIGABRT, "No memory for DFA transition matrix!");
 
         /* Convert NFA to DFA */
@@ -61,20 +46,20 @@ int dfa(FILE *input, ROW *(dfap[]), ACCEPT *(*acceptp))
         free_nfa(); 
 
         /* Build the DFA */
-        DTAB = realloc(DTAB, NSTATES * sizeof(ROW));
-        accept_states = malloc(NSTATES * sizeof(ACCEPT));
+        DFA->trans = realloc(DFA->trans, DFA->nstates * sizeof(struct dfa_table_row));
+        accept_states = malloc(DFA->nstates * sizeof(struct accept_t));
 
-        if (!accept_states || !DTAB)
+        if (!accept_states || !DFA->trans)
 	        halt(SIGABRT, "Out of memory!!");
 
-        for (i=NSTATES; i-->0;) {
-	        accept_states[i].string = DSTATES[i].accept;
-	        accept_states[i].anchor = DSTATES[i].anchor;
+        for (i=DFA->nstates; i-->0;) {
+	        accept_states[i].string = DFA->state[i].accept;
+	        accept_states[i].anchor = DFA->state[i].anchor;
         }
 
-        free(DSTATES);
-        *dfap    = DTAB;
-        *acceptp = accept_states;
+        free(DFA->state);
+        *tab = DFA->trans;
+        *acc = accept_states;
 
         return NSTATES;
 }
@@ -85,13 +70,13 @@ int add_to_dstates(SET *NFA_set, char *accept_string, int anchor)
 {
         int nextstate;
 
-	if (NSTATES > (DFA_MAX-1))
+	if (DFA->nstates > (DFA_MAX-1))
 	    halt(SIGABRT, "Too many DFA states\n");
 
-	nextstate = NSTATES++;
-	DSTATES[nextstate].set    = NFA_set;
-	DSTATES[nextstate].accept = accept_string;
-	DSTATES[nextstate].anchor = anchor;
+	nextstate = DFA->nstates++;
+	DFA->state[nextstate].set    = NFA_set;
+	DFA->state[nextstate].accept = accept_string;
+	DFA->state[nextstate].anchor = anchor;
 
 	return nextstate;
 }
@@ -106,11 +91,11 @@ int add_to_dstates(SET *NFA_set, char *accept_string, int anchor)
 int in_dstates(SET *NFA_set)
 {
         struct dfa_state *p;
-        struct dfa_state *end = &DSTATE[NSTATES];
+        struct dfa_state *end = &DFA->state[DFA->nstates];
 
-        for (p=DSTATES; p<end; ++p) {
+        for (p=DFA->dstate; p<end; ++p) {
 	        if (IS_EQUIVALENT(NFA_set, p->set))
-	                return(p - DSTATES);
+	                return(p - DFA->state);
         }
 
         return -1;
@@ -124,13 +109,13 @@ int in_dstates(SET *NFA_set)
  * exists, return NULL. Print an asterisk for each state to tell the
  * user that the program hasn't died while the table is being constructed.
  */
-DFA_STATE *get_unmarked(void)
+struct dfa_state *get_unmarked(void)
 {
-        for (; Last_marked<&DSTATES[NSTATES]; ++Last_marked) {
-	        if (!Last_marked->mark) {
+        for (; DFA->prev < &DFA->state[DFA->nstates]; ++DFA->prev) {
+	        if (!DFA->prev->mark) {
 	                putc('*', stderr);
 	                fflush(stderr);
-	                return Last_marked;
+	                return DFA->prev;
 	        }
         }
         return NULL;
@@ -141,9 +126,9 @@ DFA_STATE *get_unmarked(void)
 void free_sets(void)
 {
         struct dfa_state *p;
-        struct dfa_state *end = &DSTATES[NSTATES];
+        struct dfa_state *end = &DFA->state[DFA->nstates];
 
-        for (p=DSTATES; p<end; ++p)
+        for (p=DFA->state; p<end; ++p)
 	        delset(p->set);
 }
 
@@ -170,9 +155,9 @@ void make_dtran(int sstate)
         NFA_set = newset() ;
         ADD(NFA_set, sstate);
 
-        NSTATES	= 1;
-        DSTATES[0].set  = e_closure(NFA_set,&DSTATES[0].accept,&DSTATES[0].anchor);
-        DSTATES[0].mark = 0;
+        DFA->nstates = 1;
+        DFA->state[0].set  = e_closure(NFA_set,&DFA->state[0].accept,&DFA->state[0].anchor);
+        DFA->state[0].mark = 0;
 
         /* Make the table */
         while (current = get_unmarked()) {
@@ -192,7 +177,7 @@ void make_dtran(int sstate)
 	                else
 		                nextstate = add_to_dstates(NFA_set, isaccept, anchor);
 
-	                DTAB[current-DSTATES][c] = nextstate;
+	                DFA->trans[current-DFA->state][c] = nextstate;
 	        }
         }
         /* Terminate string of *'s printed in get_unmarked(); */

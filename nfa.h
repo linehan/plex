@@ -16,6 +16,12 @@ struct nfa_t {
 };
 
 
+struct nfa_t *nfa_base;  // Base address of nfa_states array 
+struct nfa_t *nfa_state; // State machine array 
+int nfa_nstates;         // Number of states in array.
+int nfa_next;            // Index of next element in the array. 
+
+
 /* Non-character edge values */
 #define EPSILON -1
 #define CCL     -2

@@ -22,15 +22,10 @@ char *beg_input;      // Beginning of input string
 enum  token cur_tok;  // Current token
 int   lexeme;         // Value associated with LITERAL
 
+struct nfa_t  *STACK[SSIZE];        // Stack used by new() 
+struct nfa_t **STACKP = &STACK[-1]; // Stack pointer 
 
-struct nfa_t *nfa_stack[SSIZE];                // Stack used by new() 
-struct nfa_t **nfa_stack_ptr = &nfa_stack[-1]; // Stack pointer 
 
-
-struct nfa_t *nfa_base;   // Base address of nfa_states array 
-struct nfa_t *nfa_states; // State machine array 
-int nfa_nstates=0;        // Number of states in array.
-int nfa_next;             // Index of next element in the array. 
 
 
 /*****************************************************************************
@@ -48,27 +43,29 @@ int nfa_next;             // Index of next element in the array.
  * contain the maximum number of states. Subsequent calls simply return
  * a pointer to a region of this memory block.
  */
-struct nfa_t *new_nfa(void)
+struct nfa_t *new_nfa(struct pgen_t *pgen)
 {
         static bool init = false;
-        struct nfa_t *new;
+        struct nfa_node *new;
 
-        /* Allocate memory for the maximum number of states at once. */
         if (!init) {
-                nfa_states = calloc(NFA_MAX, sizeof(struct nfa_t));
 
-                if (!nfa_states)
+                /* Allocate memory for the maximum number of states. */
+                nfa_state = calloc(NFA_MAX, sizeof(struct nfa_t));
+
+                if (!nfa_state)
                         halt(SIGABRT, "Could not allocate NFA.\n");
 
-                nfa_stack_ptr = &nfa_state_stack[-1];
+                STACKP = &STACK[-1];
                 init = true;
         }
-
         if (++nfa_nstates >= NFA_MAX) 
                 halt(SIGABRT, "Too long\n");	
 
-        /* If the stack is not ok, it's empty */
-        new = !STACK_OK() ? &nfa_states[nfa_next++] : POP();
+        /* 
+         * If the stack is not ok, it's empty 
+         */
+        new = !STACK_OK() ? &nfa_state[nfa_next++] : POP();
         new->edge = EPSILON;
 
         return new;
@@ -84,13 +81,13 @@ struct nfa_t *new_nfa(void)
  * Actually decrements the number of states and clears the region
  * of memory in the allocated NFA stack block.
  */
-void del_nfa(NFA *nfa)
+void del_nfa(struct nfa_t *doomed)
 {
         --nfa_nstates;
 
-        memset(nfa, 0, sizeof(NFA));
-        nfa->edge = EMPTY ;
-        PUSH(nfa);
+        memset(doomed, 0, sizeof(NFA));
+        doomed->edge = EMPTY ;
+        PUSH(doomed);
 
         if (!STACK_OK())
                 halt(SIGABRT, "Stack overflow!");
@@ -168,10 +165,10 @@ char *save(char *str)
  * ````````
  * The main access routine. Creates an NFA using Thompson's construction.
  *
- * @max_state: the maximum number of states, modified to reflect largest used.
+ * @max_state  : the maximum number of states, modified to reflect largest used.
  * @start_state: modified to be the start state
  */
-struct nfa_t *thompson(int *max_state, NFA **start_state)
+struct nfa_t *thompson(int *max_state, struct nfa_t **start_state)
 {
         CLEAR_STACK();
 
@@ -185,7 +182,7 @@ struct nfa_t *thompson(int *max_state, NFA **start_state)
         *start_state = machine(); // Manufacture the NFA
         *max_state   = nfa_next;  // Max state # in NFA
 
-        return nfa_base;
+        return nfa_state;
 }
 
 
@@ -201,14 +198,15 @@ struct nfa_t *thompson(int *max_state, NFA **start_state)
 int nfa(FILE *input)
 {
     struct nfa_t *sstate;
-    Nfa = thompson(&nfa_states, &sstate);
-    return (sstate - nfa_base);
+
+    nfa_state = thompson(&nfa_nstates, &sstate);
+    return (sstate - nfa_state);
 }
 
 
 void free_nfa(void)
 {
-    free(nfa_base);
+    free(nfa_state);
 }
 
 
@@ -271,7 +269,7 @@ SET *e_closure(SET *input, char **accept, int *anchor)
         while (INBOUNDS(stack,tos))	{
                 /* 2 */
 	        i = *tos--;
-	        p = &nfa_base[i];
+	        p = &nfa_state[i];
 
 	        if (p->accept && (i < accept_num)) {
                         accept_num = i;
@@ -325,13 +323,13 @@ SET *move(SET *inp_set, int c)
 
         for (i = nfa_states; --i >= 0;) {
 	        if (MEMBER(inp_set, i)) {
-	                p = &nfa_base[i];
+	                p = &nfa_state[i];
 
                         if (p->edge==c || (p->edge==CCL && TEST(p->bitset, c))) {
                                 if(!outset)
                                         outset = newset();
 
-                                ADD(outset, p->next - nfa_base);
+                                ADD(outset, p->next - nfa_state);
                         }
 	        }
         }
@@ -344,7 +342,7 @@ SET *move(SET *inp_set, int c)
 
 #ifdef MAIN
 
-main(int argc, char **argv )
+void main(int argc, char **argv)
 {
         struct nfa_t *nfa;
         struct nfa_t *start_state;

@@ -1,56 +1,60 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
+
+#include "lib/textutils.h"
 #include "lib/error.h"
+#include "nfa.h"
+#include "main.h"
 
 /*
  * Lexical analyzer.
  */
-enum token current_tok;
-char *input_line;
-char *input_start;
-char *lexeme;
+enum token Token;
+char *Current;
+char *Start;
+char *Lexeme;
 
 
-enum token lex_advance(void)
+enum token advance(void)
 {
-        static bool inquote = false; // When processing a quoted string.
+        static bool in_quote = false; // When processing a quoted string.
         bool saw_escape;             // Saw a backslash escape
 
-        static char *stack[SSIZE];   // Import stack
-        static char **sp = NULL;     // Stack pointer
+        static char *stack[32];   // Import stack
+        static char **sp = NULL;  // Stack pointer
 
         /* Initialize the stack pointer. */
         if (!sp)
                 sp = stack - 1; // Necessary for a large model.
 
         /* Get the next line */
-        if (current_tok == EOS) {
-	        if (inquote)
+        if (Token == EOS) {
+
+	        if (in_quote)
 	                halt(SIGABRT, "No newline.");
-                /*
-                 * Sit in this loop until a non-blank line is read
-                 * into the "Input" array.
+
+                /* 
+                 * Loop until a non-blank line is read. 
                  */
 	        do {
-                        /* Then at the end of file. */
-	                if (!(input = (getline)())) {
-		                current_tok = END_OF_INPUT;
+	                if (!(Current = getline(&Current, MAXLINE, pgen->in))) {
+		                Token = END_OF_INPUT;
 		                goto exit;
                         }
-                        /* Ignore leading whitespace. */
-	                while (isspace(*input))	  	
-		                input++;
+	                while (isspace(*Current))	  	
+		                Current++;
 
-	        } while (!*input); /* Ignore blank lines. */
+	        } while (!*Current); /* Ignore blank lines. */
 
-	        input_start = input; // Remember start of line for errors.
+	        Start = Current; // Remember start of line for errors.
         }
 
-        while (*input == '\0') {
+        while (*Current == '\0') {
                 /* Restore previous input source. */
 	        if (INBOUNDS(stack, sp)) {
-	                input = *sp--;
+	                Current = *sp--;
 	                continue;
 	        }
 
@@ -58,18 +62,18 @@ enum token lex_advance(void)
                  * No more input sources to restore; you're at the real end
                  * of the input string.
                  */
-	        current_tok = EOS;
-	        lexeme = '\0';
+	        Token = EOS;
+	        Lexeme = '\0';
 	        goto exit;
         }
 
-        if (!inquote) {
+        if (!in_quote) {
                 /* Macro expansion required. */
-	        while (*input == '{') {
+	        while (*Current == '{') {
                         /* Stack current input string. */
-	                *++sp = input;
+	                *++sp = Current;
                         /* Use macro body as input string. */
-	                input = get_macro(sp); 
+	                Current = get_macro(sp); 
 
 	                if (TOOHIGH(stack,sp))
 		                halt(SIGABRT, "Stack overflow"); 
@@ -78,40 +82,40 @@ enum token lex_advance(void)
 
         /* 
          * At either start or end of a quoted string. All characters are
-         * treated as literals while inquote is true.
+         * treated as literals while in_quote is true.
          */
-        if (*input == '"') {
-	        inquote = ~inquote;
-	        if (!*++input) {
-	                current_tok = EOS;
-	                lexeme = '\0';
+        if (*Current == '"') {
+	        in_quote = ~in_quote;
+	        if (!*++Current) {
+	                Token = EOS;
+	                Lexeme = '\0';
 	                goto exit;
 	        }
         }
 
-        saw_escape = (*input == '\\');
+        saw_escape = (*Current == '\\');
 
-        if (!inquote) {
-	        if (isspace(*input)) {
-	                current_tok = EOS;
-	                lexeme = '\0';
+        if (!in_quote) {
+	        if (isspace(*Current)) {
+	                Token = EOS;
+	                Lexeme = '\0';
 	                goto exit;
 	        }
-	        lexeme = esc(&input);
+	        Lexeme = esc(&Current);
         } else {
-	        if (saw_escape && input[1] == '"') {
+	        if (saw_escape && Current[1] == '"') {
                 /* Skip the escaped character. */
-	                input += 2;	
-	                lexeme = '"';
+	                Current += 2;	
+	                Lexeme = '"';
 	        } else {
-	                lexeme = *input++;
+	                Lexeme = *Current++;
                 }
         }
 
-        current_tok = (inquote || saw_escape) ? L : [lexeme];
+        Token = (in_quote || saw_escape) ? L : TOKEN_MAP[Lexeme];
 
         exit:
-                return current_tok;
+                return Token;
 }
 
 
@@ -143,23 +147,19 @@ enum token lex_advance(void)
  * ```````
  * Build the NFA
  */
-NFA *machine(void)
+struct nfa_t *machine(void)
 {
-        NFA *start;
-        NFA *p;
-
-        ENTER("machine");
+        struct nfa_t *start;
+        struct nfa_t *p;
 
         p = start = new_nfa();
         p->next   = rule();
 
-        while (!MATCH(END_OF_INPUT)) {
+        while (Token != END_OF_INPUT) {
                 p->next2 = new_nfa();
                 p        = p->next2;
                 p->next  = rule();
         }
-
-        LEAVE("machine");
 
         return start;
 }
@@ -177,13 +177,11 @@ NFA *machine(void)
  *	action	--> <tabs> <string of characters>
  *		    epsilon
  */
-NFA *rule(void)
+struct nfa_t *rule(void)
 {
-        NFA *start = NULL;
-        NFA *end   = NULL;
+        struct nfa_t *start = NULL;
+        struct nfa_t *end   = NULL;
         int anchor = NONE;
-
-        ENTER("rule");
 
         if (MATCH(AT_BOL)) {
     	        start 	     =  new_nfa();
@@ -220,8 +218,6 @@ NFA *rule(void)
         end->anchor = anchor;
         advance(); // Skip past EOS
 
-        LEAVE("rule");
-
         return start;
 }
 
@@ -249,13 +245,11 @@ NFA *rule(void)
  *		cat_expr
  *		do the OR
  */
-void expr(NFA **startp, NFA **endp)
+void expr(struct nfa_t **startp, struct nfa_t **endp)
 {
-        NFA *e2_start = NULL; /* expression to right of | */
-        NFA *e2_end   = NULL;
-        NFA *p;
-
-        ENTER("expr");
+        struct nfa_t *e2_start = NULL; /* expression to right of | */
+        struct nfa_t *e2_end   = NULL;
+        struct nfa_t *p;
 
         cat_expr(startp, endp);
 
@@ -273,7 +267,6 @@ void expr(NFA **startp, NFA **endp)
 	        e2_end ->next = p;
 	        *endp = p;
         }
-        LEAVE("expr");
 }
 
 
@@ -292,31 +285,27 @@ void expr(NFA **startp, NFA **endp)
  *	cat_expr' -> | factor cat_expr'
  *		     epsilon
  */
-void cat_expr(NFA **startp, NFA **endp )
+void cat_expr(struct nfa_t **startp, struct nfa_t **endp )
 {
-        NFA *e2_start;
-        NFA *e2_end;
+        struct nfa_t *e2_start;
+        struct nfa_t *e2_end;
 
-        ENTER("cat_expr");
-
-        if (first_in_cat(current_tok))
+        if (first_in_cat(Token))
 	        factor(startp, endp);
 
-        while (first_in_cat(current_tok)) {
+        while (first_in_cat(Token)) {
 	        factor(&e2_start, &e2_end);
 
-	        memcpy(*endp, e2_start, sizeof(NFA));
+	        memcpy(*endp, e2_start, sizeof(struct nfa_t));
 	        discard(e2_start);
 
 	        *endp = e2_end;
         }
-
-        LEAVE("cat_expr");
 }
 
 
 
-int first_in_cat(TOKEN tok)
+int first_in_cat(enum token tok)
 {
         switch(tok) 
         {
@@ -349,12 +338,10 @@ int first_in_cat(TOKEN tok)
 /*		
  * factor --> term*  | term+  | term?
  */
-void factor(NFA **startp, NFA **endp)
+void factor(struct nfa_t **startp, struct nfa_t **endp)
 {
-        NFA *start;
-        NFA *end;
-
-        ENTER("factor");
+        struct nfa_t *start;
+        struct nfa_t *end;
 
         term(startp, endp);
 
@@ -376,8 +363,6 @@ void factor(NFA **startp, NFA **endp)
                 *endp    = end;
                 advance();
         }
-
-        LEAVE("factor");
 }
 
 
@@ -389,12 +374,10 @@ void factor(NFA **startp, NFA **endp)
  * but not a carriage return (\r). All of these are single nodes in the
  * NFA.
  */
-void term(NFA **startp, NFA **endp)
+void term(struct nfa_t **startp, struct nfa_t **endp)
 {
-        NFA *start;
+        struct nfa_t *start;
         int c;
-
-        ENTER("term");
 
         if (MATCH(OPEN_PAREN)) {
 	        advance();
@@ -449,35 +432,32 @@ void term(NFA **startp, NFA **endp)
                         advance();
                 }
         }
-        LEAVE("term");
 }
 
 
 
-void dodash(SET *set)
+void dodash(struct set_t *set)
 {
         register int first;
 
         /* Treat [-...] as a literal dash, but print a warning. */
         if (MATCH(DASH)) {		
-	        warning(W_STARTDASH);
-	        ADD(set, lexeme);
+	        ADD(set, Lexeme);
 	        advance();
         }
 
         for (; !MATCH(EOS) && !MATCH(CCL_END); advance()) {
 	        if (!MATCH(DASH)) {
-	                first = lexeme;
-	                ADD(set, lexeme);
+	                first = Lexeme;
+	                ADD(set, Lexeme);
                 /* Looking at a dash */
 	        } else {
 	                advance();
                         /* Treat [...-] as literal */
 	                if (MATCH(CCL_END)) {
-		                warning(W_ENDDASH);
 		                ADD(set, '-');
 	                } else {
-		                for (; first<=lexeme; first++)
+		                for (; first<=Lexeme; first++)
 		                        ADD(set, first);
                         }
 	        }
