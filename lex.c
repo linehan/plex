@@ -8,13 +8,14 @@
 #include "lib/set.h"
 #include "nfa.h"
 #include "main.h"
+#include "macro.h"
 #include "lex.h"
 
 
 FILE *Input;
 enum token Token;
-char *Current;
-char *Start;
+char *Current;    // Current position in the input scan.
+char *Start;      // Start of Current.
 int   Lexeme;
 
 
@@ -51,30 +52,50 @@ struct nfa_t *machine(FILE *input)
  * Lexical analyzer.
  ******************************************************************************/
 
-
+/**
+ * advance
+ * ```````
+ * Get the next token by scanning the input file.
+ *
+ * @???
+ * Return: The next token.
+ *
+ * TODO
+ * Consider breaking this thing up into smaller inline functions.
+ *
+ * NOTE
+ * There is some complicated code in this function, and most of it has
+ * to do with macros. Because macro definitions can be nested, a stack
+ * is required to hold the parent macro as its child is expanded, after
+ * which the parent can be popped from the stack and expanded in turn.
+ * Thus, for several operations, we have to also check and make sure if
+ * the macro stack is empty. If it isn't, then we aren't actually done
+ * scanning.
+ */
 enum token advance(void)
 {
         static bool in_quote = false; // When processing a quoted string.
-        bool saw_escape;             // Saw a backslash escape
+        bool saw_escape;              // Saw a backslash escape
 
         static char *stack[32];   // Import stack
         static char **sp = NULL;  // Stack pointer
 
         /* Initialize the stack pointer. */
         if (!sp)
-                sp = stack - 1; // Necessary for a large model.
+                sp = stack-1; // Necessary for a large model.
 
-        /* Get the next line */
+        /* 
+         * If the current Token value indicates end-of-string (EOS),
+         * we must attempt to read the next line of the input file. 
+         */
         if (Token == EOS) {
 
 	        if (in_quote)
 	                halt(SIGABRT, "No newline.");
 
-                /* 
-                 * Loop until a non-blank line is read. 
-                 */
+                /* Loop until a non-blank line is read. */
 	        do {
-	                if (!(Current = getline(&Current, MAXLINE, Input))) {
+	                if (!(Current = getstr(&Current, MAXLINE, Input))) {
 		                Token = END_OF_INPUT;
 		                goto exit;
                         }
@@ -86,28 +107,38 @@ enum token advance(void)
 	        Start = Current; // Remember start of line for errors.
         }
 
+        /*
+         * If the current input value is a NUL byte, check to see if it
+         * is the actual end of the input file.
+         */
         while (*Current == '\0') {
-                /* Restore previous input source. */
+                /* 
+                 * If there is still data on the stack, we aren't actually
+                 * done scanning, so we decrement the stack pointer and 
+                 * continue.
+                 */
 	        if (INBOUNDS(stack, sp)) {
 	                Current = *sp--;
 	                continue;
 	        }
-
                 /* 
-                 * No more input sources to restore; you're at the real end
-                 * of the input string.
+                 * If the stack is empty and our current byte is NUL, then
+                 * we can conclude that we're actually done scanning.
                  */
 	        Token = EOS;
 	        Lexeme = '\0';
 	        goto exit;
         }
 
+        /* 
+         * If we aren't inside of quotes and encounter a '{', it means
+         * we have a macro that needs to be expanded.
+         */
         if (!in_quote) {
-                /* Macro expansion required. */
 	        while (*Current == '{') {
-                        /* Stack current input string. */
+                        /* Push current input string to the stack. */
 	                *++sp = Current;
-                        /* Use macro body as input string. */
+                        /* Switch the input string to the new macro. */
 	                Current = get_macro(sp); 
 
 	                if (TOOHIGH(stack,sp))
@@ -122,7 +153,7 @@ enum token advance(void)
         if (*Current == '"') {
 	        in_quote = ~in_quote;
 	        if (!*++Current) {
-	                Token = EOS;
+	                Token  = EOS;
 	                Lexeme = '\0';
 	                goto exit;
 	        }
@@ -307,7 +338,7 @@ void cat_expr(struct nfa_t **startp, struct nfa_t **endp )
 	        factor(&e2_start, &e2_end);
 
 	        memcpy(*endp, e2_start, sizeof(struct nfa_t));
-	        discard(e2_start);
+	        del_nfa(e2_start);
 
 	        *endp = e2_end;
         }
@@ -317,7 +348,7 @@ void cat_expr(struct nfa_t **startp, struct nfa_t **endp )
 
 int first_in_cat(enum token tok)
 {
-        switch(tok) 
+        switch ((int)tok) 
         {
         case CLOSE_PAREN:
         case AT_EOL:
@@ -442,7 +473,7 @@ void term(struct nfa_t **startp, struct nfa_t **endp)
 
 void dodash(struct set_t *set)
 {
-        register int first;
+        register int first = 0;
 
         /* Treat [-...] as a literal dash, but print a warning. */
         if (Token == DASH) {		

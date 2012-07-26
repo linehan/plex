@@ -20,7 +20,7 @@ struct set_t *new_set(void)
         struct set_t *new;
 
         if (!(new = calloc(1, sizeof(struct set_t)))) {
-                halt(SIGABRT, "No memory to create SET.\n")
+                halt(SIGABRT, "No memory to create SET.\n");
                 return NULL; // "Shouldn't happen."
         }
 
@@ -94,8 +94,8 @@ struct set_t *dup_set(struct set_t *set)
  */
 int _add_set(struct set_t *set, int bit) 
 {
-        grow_set(_ROUND(bit), set);
-        return _GBIT(set, bit, |=);
+        grow_set(set, _ROUND(bit));
+        return _GETBIT(set, bit, |=);
 }
 
 
@@ -120,7 +120,7 @@ void grow_set(struct set_t *set, int need)
                 halt(SIGABRT, "No memory to expand SET.\n");
 
         memcpy(new, set->map, set->nwords * sizeof(_SETTYPE));
-        memcpy(new + set->nwords, 0, (need - set->nwords) * sizeof(_SETTYPE));
+        memset(new + set->nwords, 0, (need - set->nwords) * sizeof(_SETTYPE));
 
         if (set->map != set->defmap)
                 free(set->map);
@@ -191,12 +191,13 @@ int _set_test(struct set_t *set1, struct set_t *set2)
         _SETTYPE *p2;
         int rval;
         int i;
+        int j;
 
         rval = _SET_EQUIV;
         i = max(set1->nwords, set2->nwords);
 
-        grow_set(i, set1);
-        grow_set(i, set2);
+        grow_set(set1, i);
+        grow_set(set2, i);
 
         p1 = set1->map;
         p2 = set2->map;
@@ -213,12 +214,12 @@ int _set_test(struct set_t *set1, struct set_t *set2)
          * sets because they might actually intersect
          * at some yet-unseen byte.
          */
-        if ((j = set1->nwords - i) > 0)        // set1 is larger
+        if ((j = set1->nwords - i) > 0) {        // set1 is larger
                 while (--j >= 0) {
                         if (*p1++)
                                 return 1;
                 }
-        } else if ((j = set2->nwords - i) > 0) // set2 is larger
+        } else if ((j = set2->nwords - i) > 0) { // set2 is larger
                 while (--j >= 0) {
                         if (*p2++)
                                 return -1;
@@ -237,7 +238,7 @@ int _set_test(struct set_t *set1, struct set_t *set2)
  * @set2  : Pointer to another set.
  * Returns: 0 if set1==set2, < 0 if set1<set2, > 0 if set1>set2.
  */
-void set_cmp(struct set_t *set1, struct set_t *set2)
+int set_cmp(struct set_t *set1, struct set_t *set2)
 {
         _SETTYPE *p1;
         _SETTYPE *p2;
@@ -255,12 +256,12 @@ void set_cmp(struct set_t *set1, struct set_t *set2)
          * You get here only if all words in both sets are the same.
          * Check the tail end of the larger array for all zeroes.
          */
-        if ((j = set1->nwords - i) > 0)        // set1 is larger
+        if ((j = set1->nwords - i) > 0) {       // set1 is larger
                 while (--j >= 0) {
                         if (*p1++)
                                 return 1;
                 }
-        } else if ((j = set2->nwords - i) > 0) // set2 is larger
+        } else if ((j = set2->nwords - i) > 0) { // set2 is larger
                 while (--j >= 0) {
                         if (*p2++)
                                 return -1;
@@ -353,13 +354,13 @@ void _set_op(int op, struct set_t *dest, struct set_t *src)
         _SETTYPE *d; // Destination map.
         _SETTYPE *s; // Source map.
         unsigned ssize; // Number of words in source set.
-        int tail // Dest is this many words bigger than source. 
+        int tail; // Dest is this many words bigger than source. 
 
         ssize = src->nwords;
 
         /* Make sure destination is big enough. */
         if ((unsigned)dest->nwords < ssize)
-                grow_set(ssize, dest);
+                grow_set(dest, ssize);
 
         tail = dest->nwords - ssize;
         d = dest->map;
@@ -480,6 +481,7 @@ int next_member(struct set_t *set)
  */
 void print_set(struct set_t *set)
 {
+        int did_something=0;
         int i;
 
         if (!set)

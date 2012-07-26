@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "lib/error.h"
+#include "lib/map.h"
+#include "lib/set.h"
 
 #include "nfa.h"
 #include "lex.h"
@@ -106,7 +108,14 @@ void del_nfa(struct nfa_t *doomed)
 /**
  * save
  * ````
- * A single large array will hold all the strings in the NFA.
+ * Given a string, return a copy of that string stored in memory.
+ *
+ * @str  : String to be copied.
+ * Return: Pointer to the copy.
+ *
+ * NOTE
+ * The first time save() is called, a large block of memory is 
+ * allocated to hold all the strings that will be saved.
  */
 char *save(char *str)
 {
@@ -118,13 +127,18 @@ char *save(char *str)
         char *textp;
         int len;
 
+        /*
+         * Allocate space for the maximum number of strings.
+         */
         if (!init) {
                 if (!(savep = strings = (int *)malloc(STR_MAX)))
                         halt(SIGABRT, "Out of memory");	
                 init = true;
         }
 
-        /* Query mode. Returns number of bytes in use. */
+        /* 
+         * Query mode. Returns number of bytes in use. 
+         */
         if (!str) {
                 sprintf(size, "%ld", (long)(savep - strings));
                 return size;
@@ -189,6 +203,10 @@ struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state)
         return nfa_state;
 }
 
+
+/*****************************************************************************
+ * The main interfaces, for some reason, when you enter from dfa.c
+ *****************************************************************************/
 
 /** 
  * nfa
@@ -266,7 +284,7 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
         *accept = NULL; 
         tos     = &stack[-1];
 
-        for (next_member(NULL); (i=next_member(input)) >= 0;)
+        for (set_next(NULL); (i=set_next(input)) >= 0;)
 	        *++tos = i;
 
         /* 1 */
@@ -285,7 +303,7 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
 	        if (p->edge == EPSILON) {
 	                if (p->next) {
                                 /* 4 */
-                                i = p->next - nfa;
+                                i = p->next - nfa_base;
                                 if (!MEMBER(input, i)) {
                                         /* 5 */
                                         ADD(input, i);
@@ -295,7 +313,7 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
 	                }
                         if (p->next2) {
                                 /* 4 */
-                                i = p->next2 - nfa;
+                                i = p->next2 - nfa_base;
                                 if (!MEMBER(input, i)) {
                                         /* 5 */
                                         ADD( input, i);
@@ -325,7 +343,7 @@ struct set_t *move(struct set_t *inp_set, int c)
         struct nfa_t *p;             // Current NFA state
         int i;
 
-        for (i = nfa_states; --i >= 0;) {
+        for (i = nfa_nstates; --i >= 0;) {
 	        if (MEMBER(inp_set, i)) {
 	                p = &nfa_state[i];
 

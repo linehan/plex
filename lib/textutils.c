@@ -674,40 +674,44 @@ void strip_comments(char *str)
 
 
 /**
- * getline
- * ```````
- * Get a line of input.
+ * getstr 
+ * ``````
+ * Get a string (NUL-terminated) of input. Returns the number of bytes read.
  *
- * @stringp: Pointer to a string pointer.
+ * @dest   : Pointer to a string pointer.
  * @max    : Get no more than n-1 characters.
  * @stream : Get the next string from this file stream.
- * Return  : EOF if end of file, 0 if line is too long, otherwise lookahead.
+ * Return  : Number of bytes (characters) read.
+ *
+ * NOTE
+ * Compare the return value with that of fgets(), which returns a pointer
+ * to the string which was read from the input stream. This is the main
+ * difference between the two functions.
  */
-int getline(char **dest, int n, FILE *stream)
+size_t getstr(char **dest, int n, FILE *stream)
 {
-        static int lookahead = 0;
+        static size_t len = 0;
         char *str;
        
         str = *dest;
 
         /* Initialize */
-        if (lookahead == 0)
-	        lookahead = getc(stream);
+        if (len == 0)
+	        len = getc(stream);
 
-        if (n > 0  && lookahead != EOF) {
-	        while(n--> 0) {
-	                *str = lookahead = getc(stream);
+        if (n>0 && len!=EOF) {
+	        while (n-->0) {
+	                *str = len = getc(stream);
 
-	                if (*str == '\n' || *str == EOF)
+	                if (*str=='\n' || *str==EOF)
 		                break;
 	                str++;
 	        }
 	        *str  = '\0';
 	        *dest = str;
         }
-        return (n <= 0) ? 0 : lookahead;
+        return (n <= 0) ? 0 : len;
 }
-
 
 
 /**
@@ -727,7 +731,7 @@ char *get_expr(FILE *fd_input)
         int size;
         char *line;
 
-        size = MAXINP;
+        size = MAXLINE;
 
         /* If the next line starts with %, return the EOF marker. */
         if (lookahead == '%')	
@@ -741,7 +745,7 @@ char *get_expr(FILE *fd_input)
 	        if (!line[0])
 	                continue;
 
-	        size = MAXINP - (line-IBUF);
+	        size = MAXLINE - (line-IBUF);
 
                 /* Ignore whitespace */
 	        if (!isspace(lookahead))
@@ -752,6 +756,35 @@ char *get_expr(FILE *fd_input)
 
         return lookahead ? line : NULL;
 }
+
+
+/**
+ * esc_fputs
+ *
+ * Write string to file stream, with control characters mapped to readable text.
+ *
+ * @str   : String to be written (May contain control characters)
+ * @max   : Maximum number of characters to write to @stream.
+ * @stream: Open file stream.
+ * Return : Nothing. 
+ * 
+ * TODO
+ * Make this thing return the number of characters written, cmon.
+ */
+void esc_fputs(char *str, size_t max, FILE *stream)
+{
+        char *s;
+
+        while (*str && max >= 0) {
+
+                s = bin_to_ascii(*str++, 1);
+
+                while (*s && --max >= 0) {
+                        fputc(*s++, stream);
+                }
+        }
+}
+
 
 
 
@@ -784,6 +817,49 @@ int oct2bin(int c)
 {
         return (((c)-'0') & 0x7);
 }
+
+
+/**
+ * bin_to_ascii
+ * ````````````
+ * Return a pointer to a string that represents the byte c in escaped form.
+ *
+ * @c      : A byte, potentially a control character.
+ * @use_hex: Use hexadecimal escape sequences.
+ * Returns : A string representing @c in human-readable form.
+ *
+ * HISTORY
+ * Credit to Alan Holub, in "Compiler Construction in C".
+ */
+char *bin_to_ascii(int c, int use_hex)
+{
+        static char buf[8];
+
+        c &= 0xff;
+
+        if ('' <= c && c < 0x7f && c != '\'' && c != '\\') {
+                buf[0] = c;
+                buf[1] = '\0';
+        } else {
+                buf[0] = '\\';
+                buf[2] = '\0';
+
+                switch (c) 
+                {
+                case '\\': buf[1] = '\\'; break;
+                case '\'': buf[1] = '\''; break;
+                case '\b': buf[1] = 'b';  break;
+                case '\f': buf[1] = 'f' ; break;
+                case '\t': buf[1] = 't' ; break;
+                case '\r': buf[1] = 'r' ; break;
+                case '\n': buf[1] = 'n' ; break;
+                default  : sprintf(&buf[1], use_hex ? "x%03x" : "%03o", c);
+	        }
+        }
+        return buf;
+}
+
+
 
 
 /**

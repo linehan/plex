@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "textutils.h"
+#include "lib/textutils.h"
 #include "nfa.h"
 #include "dfa.h"
 #include "main.h"
@@ -21,7 +21,7 @@
  * @nrows: Number of states in dtran[]
  * @accept: set of accept states in dtran[]
  */
-void pheader(FILE *fp, struct dfa_row **dtran, int nrows, struct accept_t *accept)
+void pheader(FILE *fp, struct dfa_table_row **dtran, int nrows, struct accept_t *accept)
 {
         int last_transition;
         int chars_printed;
@@ -40,7 +40,7 @@ void pheader(FILE *fp, struct dfa_row **dtran, int nrows, struct accept_t *accep
 	                fprintf(fp, " * State %d [accepting, line %d <",
 				    i , ((int *)(accept[i].string))[-1]);
 
-	                fputstr(accept[i].string, 20, fp);
+	                esc_fputs(accept[i].string, 20, fp);
 	                fprintf(fp, ">]");
 
                         if (accept[i].anchor)
@@ -52,9 +52,9 @@ void pheader(FILE *fp, struct dfa_row **dtran, int nrows, struct accept_t *accep
 	        last_transition = -1;
 
 	        for (j=0; j<MAX_CHARS; j++) {
-	                if (dtran[i][j] != F) {
-		                if (dtran[i][j] != last_transition) {
-		                        fprintf(fp, "\n *    goto %2d on ", dtran[i][j]);
+	                if (dtran[i]->row[j] != F) {
+		                if (dtran[i]->row[j] != last_transition) {
+		                        fprintf(fp, "\n *    goto %2d on ", dtran[i]->row[j]);
 		                        chars_printed = 0;
 		                }
 		                fprintf(fp, "%s", bin_to_ascii(j,1) );
@@ -64,7 +64,7 @@ void pheader(FILE *fp, struct dfa_row **dtran, int nrows, struct accept_t *accep
 		                        chars_printed = 0;
 		                }
 
-		                last_transition = dtran[i][j];
+		                last_transition = dtran[i]->row[j];
 	                }
 	        }
 	        fprintf(fp, "\n");
@@ -84,7 +84,7 @@ void pheader(FILE *fp, struct dfa_row **dtran, int nrows, struct accept_t *accep
  * @nrows: number of states in dtran[]
  * @accept: set of accepting states in dtran[]
  **/
-void pdriver(FILE *output, int nrows, ACCEPT *accept)
+void pdriver(FILE *output, int nrows, struct accept_t *accept)
 {
         int i;
 
@@ -113,13 +113,13 @@ void pdriver(FILE *output, int nrows, ACCEPT *accept)
         fprintf(output, "};\n\n");
 
         /* Print code above case statements */
-        driver_2(output, !NOLINE);	
+        driver_2(output, 0);	
 
         /* Print case statements */
         for (i=0; i<nrows; i++) {
 	        if (accept[i].string) {
 	                fprintf(output, "\t\tcase %d:\t\t\t\t\t/* State %-3d */\n",i,i);
-	                if (!NOLINE)
+	                if (0)
 		                fprintf(output, "#line %d \"%s\"\n",
 					    *( (int *)(accept[i].string) - 1),
 					    Input_file_name);

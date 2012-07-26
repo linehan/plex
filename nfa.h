@@ -49,7 +49,13 @@ struct nfa_t *new_nfa(void);
 void          del_nfa(struct nfa_t *doomed);
 
 struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state);
+char *save(char *str);
 
+int nfa(FILE *input);
+void free_nfa(void);
+
+struct set_t *e_closure(struct set_t *input, char **accept, int *anchor);
+struct set_t *move(struct set_t *inp_set, int c);
 
 #endif
 

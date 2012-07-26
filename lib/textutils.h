@@ -2,6 +2,7 @@
 #define __TEXTUTILS_H
 
 #include <string.h>
+#include <ctype.h>
 
 /* Initialization ----------------------------------------------------------- */
 void szero(char *str);
@@ -21,6 +22,8 @@ char *field(const char *string, const char *delimiter);
 int    ntok(const char *str, const char *tok);
 void chrswp(char *src, char at, char with, size_t len);
 
+size_t getstr(char **dest, int n, FILE *stream);
+
 /* Format print ------------------------------------------------------------- */
 void pumpf(char **strp, const char *fmt, ...);
 
@@ -33,6 +36,8 @@ void strip_comments(char *str);
 char *tail(char *string);
 
 char *get_expr(FILE *fd_input);
+char *bin_to_ascii(int c, int use_hex);
+void esc_fputs(char *str, size_t max, FILE *stream);
 
 
 /* Raw memory --------------------------------------------------------------- */

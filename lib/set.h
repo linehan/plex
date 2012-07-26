@@ -83,7 +83,7 @@ struct set_t {
 
 #define CLEAR(s)      memset((s)->map,  0, (s)->nwords * sizeof(_SETTYPE))
 #define FILL(s)       memset((s)->map, ~0, (s)->nwords * sizeof(_SETTYPE))
-#define COMPLIMENT(s) ((s)->compl = ~(s)->compl)
+#define COMPLEMENT(s) ((s)->compl = ~(s)->compl)
 #define INVERT(s)     invert(s)
 
 /* Value returned from _set_test */
@@ -93,7 +93,7 @@ struct set_t {
 
 #define IS_DISJOINT(s1,s2)     (_set_test(s1,s2) == _SET_DISJ)
 #define IS_INTERSECTING(s1,s2) (_set_test(s1,s2) == _SET_INTER)
-#define IS_EQUIVALENT(s1,s2)   (set_cmp((a),(b)) == 0)
+#define IS_EQUIVALENT(s1,s2)   (set_cmp((s1),(s2)) == 0)
 #define IS_EMPTY(s)            (set_num(s) == 0)
 
 /* 
@@ -106,6 +106,7 @@ struct set_t {
 #define ADD(s,x)    (((x) >= (s)->nbits) ? _add_set(s,x) : _GETBIT(s,x,|=))
 #define REMOVE(s,x) (((x) >= (s)->nbits) ?            0 : _GETBIT(s,x,&=~))
 #define TEST(s,x)   ((MEMBER(s,x)) ? !(s)->compl : (s)->compl )
+#define MEMBER(s,x) (((x) >= (s)->nbits) ? 0 : _GETBIT(s,x,&))
 
 
 struct set_t *new_set(void);
@@ -117,7 +118,7 @@ void _set_op(int op, struct set_t *dest, struct set_t *src);
 int _set_test(struct set_t *set1, struct set_t *set2);
 
 int      set_num   (struct set_t *set);
-void     set_cmp   (struct set_t *set1, struct set_t *set2);
+int      set_cmp   (struct set_t *set1, struct set_t *set2);
 unsigned set_hash  (struct set_t *set);
 void     set_invert(struct set_t *set);
 void     set_trunc (struct set_t *set);

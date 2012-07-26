@@ -2,12 +2,13 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "lib/hash.h"
-#include "nfa.h"
+#include "lib/textutils.h"
+#include "lib/map.h"
 #include "macro.h"
+#include "nfa.h"
 
 
-struct htab_t *MACROTABLE; /* Symbol table for macro definitions */
+struct map_t *MACROTABLE; /* Symbol table for macro definitions */
 
 
 /**
@@ -31,7 +32,7 @@ void new_macro(char *def)
 
         if (first) {
 	        first = 0;
-	        MACROTABLE = new_htab(31, sdbm_hash, strcmp);
+	        MACROTABLE = new_map(31);
         }
 
         /* Isolate name */
@@ -74,10 +75,18 @@ void new_macro(char *def)
 }
 
 
-/* 
- * Return a pointer to the contents of a macro having the indicated
- * name. Abort with a message if no macro exists. The macro name includes
- * the brackets. *namep is modified to point past the close brace.
+/** 
+ * get_macro
+ * `````````
+ * Get the contents of a macro having the indicated name.
+ * 
+ * @namep: Pointer to the name of the macro.
+ * Return: NUL-terminated string with the macro definition. 
+ *
+ * NOTES
+ * Aborts with a message if no macro matching the @namep exists.
+ * The macro name includes the brackets.
+ * @namep is modified to point past the '}'
  */
 char *get_macro(char **namep)
 {
@@ -88,12 +97,12 @@ char *get_macro(char **namep)
         if (!(p = strchr(++(*namep), '}')))
 	        halt(SIGABRT, "Bad macro.");		
         else {
-                *p = '\0'; // Overwrite }
+                *p = '\0'; // Overwrite the '}'
 
-	        if (!(mac = (struct macro_t *)findsym(MACROTABLE, *namep)))
+	        if (!(mac = (struct macro_t *)get_symbol(MACROTABLE, *namep)))
                         halt(SIGABRT, "No macro.");
 
-	        *p++ = '}'; // Re-write }
+	        *p++ = '}'; // Re-write the '}'
                 *namep = p; // Update name pointer
 
 	        return mac->text;
