@@ -35,7 +35,6 @@ void strip_comments(char *str);
 
 char *tail(char *string);
 
-char *get_expr(FILE *fd_input);
 char *bin_to_ascii(int c, int use_hex);
 void esc_fputs(char *str, size_t max, FILE *stream);
 

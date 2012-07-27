@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "lib/error.h"
+#include "lib/textutils.h"
 #include "macro.h"
 #include "main.h"
 
@@ -18,41 +19,48 @@
 
 
 /**
- * strip_comments
- * ``````````````
- * Replace C-like comments with whitespace space characters.
+ * get_expr
+ * ````````
+ * Get a regular expression and associated string from the input stream.
  *
- * @str  : String to strip comment symbols from.
- * Return: Does not return.
+ * @pgen    : Parser generator singleton object. 
+ * Return   : Pointer to the line containing the regex and string in it.
  *
  * NOTE
- * Multi-line comments are supported.
+ * Discards all blank lines and concatenates all whitespace-separated strings.
  */
-void strip_comments(char *str)
+char *get_expr(struct pgen_t *pgen)
 {
-        static bool in_comment = false;
+        static int lookahead = 0;
+        int size;
+        char *line;
 
-        for (; *str; str++) {
-	        if (in_comment) {
-                        /* Exiting comment zone */
-	                if (str[0] == '*' && str[1] == '/') {
-		                in_comment = false;
-		                *str++ = ' ';
-	                }
-                        /* Replace comments with space. */
-	                if (!isspace(*str)) {
-		                *str = ' ';
-                        }
-	        } else {
-                        /* Entering comment zone */
-	                if (str[0] == '/' && str[1] == '*') {
-		                in_comment = true;
-		                *str++ = ' ';
-		                *str   = ' ';
-	                }
-	        }
+        size = MAXLINE;
+
+        /* If the next line starts with %, return the EOF marker. */
+        if (lookahead == '%')	
+                return NULL;
+
+        while ((lookahead = getstr(&line, size-1, pgen->in)) != EOF) {
+                if (lookahead == 0)
+	                halt(SIGABRT, "Rule too long\n");
+
+                /* Ignore blank lines. */
+	        if (!line[0])
+	                continue;
+
+	        size = MAXLINE - (line - pgen->line);
+
+                /* Ignore whitespace */
+	        if (!isspace(lookahead))
+	                break;
+
+	        *line++ = '\n';
         }
+
+        return lookahead ? line : NULL;
 }
+
 
 
 /**

@@ -8,10 +8,10 @@
 
 #include "set.h"
 
-/*
+/**
  * new_set
  * ```````
- * Create a new SET. 
+ * Create a new set. 
  * 
  * Returns: Pointer to an allocated default set.
  */

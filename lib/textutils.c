@@ -715,50 +715,6 @@ size_t getstr(char **dest, int n, FILE *stream)
 
 
 /**
- * get_expr
- * ````````
- * Get a regular expression and associated string from the input stream.
- *
- * @fd_input: file descriptor of the input stream.
- * Return   : Pointer to the line containing the regex and string in it.
- *
- * NOTE
- * Discards all blank lines and concatenates all whitespace-separated strings.
- */
-char *get_expr(FILE *fd_input)
-{
-        static int lookahead = 0;
-        int size;
-        char *line;
-
-        size = MAXLINE;
-
-        /* If the next line starts with %, return the EOF marker. */
-        if (lookahead == '%')	
-                return NULL;
-
-        while ((lookahead = getline(&line, size-1, fd_input)) != EOF) {
-                if (lookahead == 0)
-	                halt(SIGABRT, "Rule too long\n");
-
-                /* Ignore blank lines. */
-	        if (!line[0])
-	                continue;
-
-	        size = MAXLINE - (line-IBUF);
-
-                /* Ignore whitespace */
-	        if (!isspace(lookahead))
-	                break;
-
-	        *line++ = '\n';
-        }
-
-        return lookahead ? line : NULL;
-}
-
-
-/**
  * esc_fputs
  *
  * Write string to file stream, with control characters mapped to readable text.
@@ -837,7 +793,7 @@ char *bin_to_ascii(int c, int use_hex)
 
         c &= 0xff;
 
-        if ('' <= c && c < 0x7f && c != '\'' && c != '\\') {
+        if (' ' <= c && c < 0x7f && c != '\'' && c != '\\') {
                 buf[0] = c;
                 buf[1] = '\0';
         } else {
@@ -936,7 +892,7 @@ int esc(char **s)
                                 rval  |= hex2bin(*(*s)++);
                         }
                         if (IS_HEXDIGIT(**s)) {
-                                rval << 4;
+                                rval <<= 4;
                                 rval  |= hex2bin(*(*s)++);
                         }
                         --(*s);

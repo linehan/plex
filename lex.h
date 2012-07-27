@@ -4,7 +4,7 @@
 #include "lib/set.h"
 
 
-enum token {
+enum token_t {
         EOS = 1,      // end of string
         ANY,          // .
         AT_BOL,       // ^ 
@@ -26,21 +26,31 @@ enum token {
 
 
 
-struct nfa_t *machine(FILE *input);
-enum token    advance(void);
-struct nfa_t    *rule(void);
-
-void        expr(struct nfa_t **startp, struct nfa_t **endp);
-void    cat_expr(struct nfa_t **startp, struct nfa_t **endp);
-int first_in_cat(enum token tok);
-
-void factor(struct nfa_t **startp, struct nfa_t **endp);
-void   term(struct nfa_t **startp, struct nfa_t **endp);
-void dodash(struct set_t *set);
+struct lexer_t {
+        FILE *input_file;
+        char *position;
+        char *line;
+        enum token_t token;
+        int  lexeme;
+};
 
 
 
-static enum token TOKEN_MAP[] = {
+struct nfa_t *machine(struct lexer_t *lex);
+enum token_t  advance(struct lexer_t *lex);
+struct nfa_t    *rule(struct lexer_t *lex);
+
+void        expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
+void    cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
+int first_in_cat(enum token_t tok);
+
+void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
+void   term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
+void dodash(struct lexer_t *lex, struct set_t *set);
+
+
+
+static enum token_t TOKEN_MAP[] = {
 //  ^@  ^A  ^B  ^C  ^D  ^E  ^F  ^G  ^H  ^I  ^J  ^K  ^L  ^M  ^N	
     L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,  L,
 //  ^O  ^P  ^Q  ^R  ^S  ^T  ^U  ^V  ^W  ^X  ^Y  ^Z  ^[  ^\  ^]	

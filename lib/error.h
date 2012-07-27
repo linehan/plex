@@ -19,8 +19,8 @@
         (VA_NUM_ARGS(__VA_ARGS__) == 1) ? raise_report(sig, __VA_ARGS__, "") \
                                         : raise_report(sig, __VA_ARGS__)     \
 
-void abort_report(const char *fmt, ...);
-void raise_report(int signo, const char *fmt, ...);
+int abort_report(const char *fmt, ...);
+int raise_report(int signo, const char *fmt, ...);
 
 
 typedef void (*sig_handler_t)(int signo);

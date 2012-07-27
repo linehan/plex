@@ -122,7 +122,7 @@ int      set_cmp   (struct set_t *set1, struct set_t *set2);
 unsigned set_hash  (struct set_t *set);
 void     set_invert(struct set_t *set);
 void     set_trunc (struct set_t *set);
-int      set_next  (struct set_t *set);
+int      next_member(struct set_t *set);
 void     set_print (struct set_t *set);
 int      is_subset (struct set_t *set, struct set_t *sub);
 

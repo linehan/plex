@@ -24,7 +24,7 @@
 void pheader(FILE *fp, struct dfa_table_row **dtran, int nrows, struct accept_t *accept)
 {
         int last_transition;
-        int chars_printed;
+        int chars_printed = 0;
         char *bin_to_ascii();
         int i;
         int j;
@@ -83,7 +83,7 @@ void pheader(FILE *fp, struct dfa_table_row **dtran, int nrows, struct accept_t 
  * @output: Output stream
  * @nrows: number of states in dtran[]
  * @accept: set of accepting states in dtran[]
- **/
+ */
 void pdriver(FILE *output, int nrows, struct accept_t *accept)
 {
         int i;
@@ -113,23 +113,19 @@ void pdriver(FILE *output, int nrows, struct accept_t *accept)
         fprintf(output, "};\n\n");
 
         /* Print code above case statements */
-        driver_2(output, 0);	
+        //driver_2(output, 0);	
 
         /* Print case statements */
         for (i=0; i<nrows; i++) {
 	        if (accept[i].string) {
 	                fprintf(output, "\t\tcase %d:\t\t\t\t\t/* State %-3d */\n",i,i);
-	                if (0)
-		                fprintf(output, "#line %d \"%s\"\n",
-					    *( (int *)(accept[i].string) - 1),
-					    Input_file_name);
 
 	                fprintf(output, "\t\t    %s\n",    accept[i].string);
 	                fprintf(output, "\t\t    break;\n");
 	        }
         }
         /* Code below cases. */
-        driver_2(output, !NOLINE);
+        //driver_2(output, !NOLINE);
 }
 
 

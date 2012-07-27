@@ -23,7 +23,7 @@
 
 char *cur_input;      // Current position in input string.
 char *beg_input;      // Beginning of input string
-enum  token cur_tok;  // Current token
+enum  token_t cur_tok;  // Current token
 int   lexeme;         // Value associated with LITERAL
 
 int LINENO=0;
@@ -190,14 +190,21 @@ struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state)
 {
         CLEAR_STACK();
 
+        /* Allocate lexer object */
+        struct lexer_t *lex;
+        lex = calloc(1, sizeof(struct lexer_t));
+
+        if (input) lex->input_file = input;
+        else       halt(SIGABRT, "Bad input file.\n");
+
         /* Load first token */
-        cur_tok = EOS;
-        advance();
+        lex->token = EOS;
+        advance(lex);
 
         nfa_nstates = 0;
         nfa_next    = 0;
 
-        *start_state = machine(input); // Manufacture the NFA
+        *start_state = machine(lex);   // Manufacture the NFA
         *max_state   = nfa_next;       // Max state # in NFA
 
         return nfa_state;
@@ -284,7 +291,7 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
         *accept = NULL; 
         tos     = &stack[-1];
 
-        for (set_next(NULL); (i=set_next(input)) >= 0;)
+        for (next_member(NULL); (i=next_member(input)) >= 0;)
 	        *++tos = i;
 
         /* 1 */

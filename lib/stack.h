@@ -1,6 +1,8 @@
 #ifndef _STACK_H
 #define _STACK_H
 
+#include "error.h"
+
 /* stack.h
  * ```````
  * Stack maintenance macros.
@@ -10,12 +12,10 @@
 
 #define stack_cls /* empty */
 
-
 #define stack_dcl(stack, type, size)                      \
-        typedef type_t_##stack;                           \
-        stack_cls t_##stack stack[size]                   \
-        stack_cls t_##stack (*p_##stack) = stack + (size) 
-
+        typedef type t_##stack;                           \
+        stack_cls    t_##stack stack[size];                  \
+        stack_cls    t_##stack (*p_##stack) = stack + (size) 
 
 #define stack_clear(stack) \
         ((p_##stack) = (stack + sizeof(stack)/sizeof(*stack)))
@@ -46,8 +46,8 @@
                              : push_(stack,x))
 
 #define pop(stack) \
-        ((stack_empty(stack) ? ((t_##stack)(long)(stack_err(0))) \
-                             : pop_(stack))
+        ((stack_empty(stack)) ? ((t_##stack)(long)(stack_err(0))) \
+                              : pop_(stack))
 
 #define pipn_(stack,amt) \
          ((p_##stack += amt)[-amt])

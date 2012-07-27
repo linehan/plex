@@ -65,7 +65,7 @@ char *emsg[]={
  * @fmt: a printf-style format string
  * @...: the variable argument list to the format string
  */
-void abort_report(const char *fmt, ...)
+int abort_report(const char *fmt, ...)
 {
         char buf[1000];
         va_list args;
@@ -83,6 +83,8 @@ void abort_report(const char *fmt, ...)
         fprintf(stderr, "The handler reported: \"%s\"\n", buf);
 
         exit(1);
+
+        return 1;
 }
 
 
@@ -95,7 +97,7 @@ void abort_report(const char *fmt, ...)
  * @fmt  : printf-style format string.
  * @...  : the variable argument list to the format string.
  */
-void raise_report(sig_t signo, const char *fmt, ...)
+int raise_report(int signo, const char *fmt, ...)
 {
         char buf[1000];
         va_list args;
@@ -113,6 +115,8 @@ void raise_report(sig_t signo, const char *fmt, ...)
         fprintf(stderr, "The handler reported: \"%s\"\n", buf);
 
         raise(signo);
+
+        return 1; 
 }
 
 
