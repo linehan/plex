@@ -21,10 +21,10 @@
 #define	SSIZE	32 // State size
 
 
-char *cur_input;      // Current position in input string.
-char *beg_input;      // Beginning of input string
+char *cur_input;        // Current position in input string.
+char *beg_input;        // Beginning of input string
 enum  token_t cur_tok;  // Current token
-int   lexeme;         // Value associated with LITERAL
+int   lexeme;           // Value associated with LITERAL
 
 int LINENO=0;
 
@@ -196,6 +196,9 @@ struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state)
 
         if (input) lex->input_file = input;
         else       halt(SIGABRT, "Bad input file.\n");
+
+        lex->line = calloc(MAXLINE, sizeof(char));
+        lex->size = MAXLINE;
 
         /* Load first token */
         lex->token = EOS;

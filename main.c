@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <unistd.h>
+#include <stdbool.h>
 
 #include "lib/error.h"
 #include "lib/textutils.h"
+#include "lib/file.h"
 #include "scan.h"
 #include "nfa.h"
 #include "dfa.h"
@@ -28,10 +31,6 @@ void flex(struct pgen_t *pgen)
         /* Construct the DFA */
         nstates = dfa(pgen, &dtrans, &accept);
 
-        /* Open the output stream */
-        if (!(fopen(pgen->path_out, "w")))
-                halt(SIGABRT, "Can't open output file.");
-
         /* Print the DFA transition table to the output stream. */
         fprintf(pgen->out,
                 "YYPRIVATE YY_TTYPE  %s[ %d ][ %d ] =\n", 
@@ -49,27 +48,74 @@ void flex(struct pgen_t *pgen)
 }
 
 
+void test(FILE *in)
+{
+        int pos;
+        char *line = NULL;
+        size_t len = 0;
+
+        while ((pos = getstr(&line, &len, in)) != EOF) {
+                printf("%s\n", line);
+        }
+
+        halt(SIGABRT, "BREAKPOINT\n");
+}
+
+
+/**
+ * pgen
+ * ````
+ * Create the parser generator object and begin execution.
+ *
+ * @input : input file.
+ * @output: output file.
+ *
+ */
+void do_pgen(FILE *input, FILE *output)
+{
+        struct pgen_t *pgen;
+
+        pgen = calloc(1, sizeof(struct pgen_t));
+
+        pgen->in  = input;
+        pgen->out = output;
+
+        //test(pgen->in);
+
+        flex(pgen);
+}
+
+
 
 /**
  * This is the actual main function. 
  */
 int main(int argc, char *argv[])
 {
-        struct pgen_t *pgen;
+        FILE *input_file = NULL;
+        FILE *output_file = NULL;
+        int c;
 
-        if (!argv[0])
-                halt(SIGABRT, "Nope.");
+        while ((c = getopt(argc, argv, "i:o:")) != -1) {
+                switch (c) {
+                case 'i':
+                        input_file = sfopen(optarg, "r");
+                        break;
+                case 'o':
+                        output_file = sfopen(optarg, "w");
+                        break;
+                default:
+                        break;
+                }
+        }
 
-        pgen = calloc(1, sizeof(struct pgen_t));
+        if (!input_file)
+                halt(SIGABRT, "Missing input (-i <INPUT>)\n");
 
-        slcpy(pgen->path_in,  argv[0], PATHSIZE);
-        slcpy(pgen->path_out, argv[1], PATHSIZE);
+        if (!output_file)
+                output_file = stdout; 
 
-        if (!(pgen->in = fopen(pgen->path_in, "r")))
-	        halt(SIGABRT,"Can't open input file %s", pgen->path_in);
-
-        flex(pgen);
-        fclose(pgen->in);
+        do_pgen(input_file, output_file);
 
         return 0;
 }

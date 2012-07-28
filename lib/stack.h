@@ -12,8 +12,8 @@
 
 #define stack_cls /* empty */
 
-#define stack_dcl(stack, type, size)                      \
-        typedef type t_##stack;                           \
+#define new_stack(stack, type, size)                         \
+        typedef type t_##stack;                              \
         stack_cls    t_##stack stack[size];                  \
         stack_cls    t_##stack (*p_##stack) = stack + (size) 
 

@@ -24,8 +24,6 @@ struct nfa_t *machine(struct lexer_t *lex)
         struct nfa_t *start;
         struct nfa_t *p;
 
-
-
         p = start = new_nfa();
         p->next   = rule(lex);
 
@@ -69,10 +67,7 @@ enum token_t advance(struct lexer_t *lex)
         static bool in_quote = false; // When processing a quoted string.
         bool saw_escape;              // Saw a backslash escape
 
-        stack_dcl(stack, char *, 32);
-
-        /*static char *stack[32];   // Import stack*/
-        /*static char **sp = NULL;  // Stack pointer*/
+        new_stack(stack, char *, 32);
 
         /* 
          * If the current token value indicates end-of-string (EOS),
@@ -85,7 +80,7 @@ enum token_t advance(struct lexer_t *lex)
 
                 /* Loop until a non-blank line is read. */
 	        do {
-	                if (!(lex->position = getstr(&lex->line, MAXLINE, lex->input_file))) {
+	                if (!(lex->position = fgets(&lex->line, lex->size, lex->input_file))) {
 		                lex->token = END_OF_INPUT;
 		                goto exit;
                         }

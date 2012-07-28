@@ -8,8 +8,10 @@
 #define DTRAN_NAME "Yy_nxt"
 #define TEMPLATE   "lex.par" // Driver template for the state machine.
 
-#define PATHSIZE 255 // Maximum pathsize on Unix
 #define MAXLINE 2048 // Max rule/line size
+#ifndef PATHSIZE
+#define PATHSIZE 255
+#endif
 
 /**
  * The parser generator singleton.
@@ -36,3 +38,4 @@ struct pgen_t {
 
 
 #endif
+

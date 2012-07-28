@@ -1,6 +1,7 @@
 #ifndef _LEXER_H
 #define _LEXER_H
 
+#include "main.h"
 #include "lib/set.h"
 
 
@@ -27,11 +28,12 @@ enum token_t {
 
 
 struct lexer_t {
+        size_t size;
+        enum token_t token;
+        int  lexeme;
         FILE *input_file;
         char *position;
         char *line;
-        enum token_t token;
-        int  lexeme;
 };
 
 

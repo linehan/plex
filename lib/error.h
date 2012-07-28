@@ -25,6 +25,7 @@ int raise_report(int signo, const char *fmt, ...);
 
 typedef void (*sig_handler_t)(int signo);
 void sigreg(sig_handler_t handler);
+int err(int number);
 
 
 #endif

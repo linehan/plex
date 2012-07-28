@@ -54,6 +54,24 @@ char *emsg[]={
         "Math argument out of domain of func",
         "Math result not representable"
 };
+
+/**
+ * err
+ * ```
+ * Set the errno global variable and return -1. Can be used in an expression.
+ *
+ * @number: error code to set errno. 
+ *
+ * NOTE
+ * err() does not interrupt program execution.
+ */
+int err(int number)
+{
+        errno = number;
+        return -1;
+}
+
+
 #endif /* USE_ERRNO_H */
 
 

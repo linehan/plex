@@ -32,7 +32,7 @@
 char *get_expr(struct pgen_t *pgen)
 {
         static int lookahead = 0;
-        int size;
+        size_t size;
         char *line;
 
         size = MAXLINE;
@@ -41,7 +41,7 @@ char *get_expr(struct pgen_t *pgen)
         if (lookahead == '%')	
                 return NULL;
 
-        while ((lookahead = getstr(&line, size-1, pgen->in)) != EOF) {
+        while ((lookahead = getstr(&line, &size, pgen->in)) != EOF) {
                 if (lookahead == 0)
 	                halt(SIGABRT, "Rule too long\n");
 
@@ -137,11 +137,5 @@ void scan_tail(struct pgen_t *pgen)
         while (fgets(pgen->line, MAXLINE, pgen->in))
 	        fputs(pgen->line, pgen->out);
 }
-
-
-
-
-
-
 
 

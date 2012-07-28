@@ -22,7 +22,7 @@ char *field(const char *string, const char *delimiter);
 int    ntok(const char *str, const char *tok);
 void chrswp(char *src, char at, char with, size_t len);
 
-size_t getstr(char **dest, int n, FILE *stream);
+ssize_t getstr(char **buf, size_t *len, FILE *stream);
 
 /* Format print ------------------------------------------------------------- */
 void pumpf(char **strp, const char *fmt, ...);
@@ -37,6 +37,8 @@ char *tail(char *string);
 
 char *bin_to_ascii(int c, int use_hex);
 void esc_fputs(char *str, size_t max, FILE *stream);
+
+void argv_print(int argc, char *argv[]);
 
 
 /* Raw memory --------------------------------------------------------------- */
