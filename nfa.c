@@ -192,12 +192,12 @@ struct nfa_t *thompson(FILE *input, int *max_state, struct nfa_t **start_state)
 
         /* Allocate lexer object */
         struct lexer_t *lex;
-        lex = calloc(1, sizeof(struct lexer_t));
+        lex = malloc(sizeof(struct lexer_t));
 
         if (input) lex->input_file = input;
         else       halt(SIGABRT, "Bad input file.\n");
 
-        lex->line = calloc(MAXLINE, sizeof(char));
+        lex->line = calloc(500, sizeof(char));
         lex->size = MAXLINE;
 
         /* Load first token */

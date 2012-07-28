@@ -80,7 +80,7 @@ enum token_t advance(struct lexer_t *lex)
 
                 /* Loop until a non-blank line is read. */
 	        do {
-	                if (!(lex->position = fgets(&lex->line, lex->size, lex->input_file))) {
+	                if (!(lex->position = fgets(lex->line, lex->size, lex->input_file))) {
 		                lex->token = END_OF_INPUT;
 		                goto exit;
                         }
@@ -345,15 +345,18 @@ int first_in_cat(enum token_t tok)
         case CLOSURE:
         case PLUS_CLOSE:
         case OPTIONAL:
-                halt(SIGABRT, "Bad closure?");
+                /*halt(SIGABRT, "Bad closure?");*/
+                DEBUG("Bad closure?\n");
                 return 0;
 
         case CCL_END:
-                halt(SIGABRT, "Bracket problems.");
+                DEBUG("Brackets ending.\n");
+                /*halt(SIGABRT, "Bracket problems.");*/
                 return 0;
 
         case AT_BOL:
-                halt(SIGABRT, "Beginning of line.");
+                DEBUG("Beginning of line.\n");
+                /*halt(SIGABRT, "Beginning of line.");*/
                 return 0;
         }
 

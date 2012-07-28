@@ -1,9 +1,9 @@
 CC=gcc
 #
 #                 
-# optimize   warnings
-# lvl 3 \     /    
-CFLAGS=-O3 -Wall            
+# optimize  warning gnu debugger
+# lvl 3 \   |      /
+CFLAGS=-O3 -Wall -g 
 LDFLAGS= 
 #      
 #    

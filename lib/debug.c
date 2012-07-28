@@ -4,55 +4,60 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#include "error.h"
+#include "debug.h"
+
 
 #define USE_ERRNO_H
 
-#ifdef USE_ERRNO_H
-char *etag[]={ "", "EPERM",   "ENOENT",  "ESRCH",   "EINTR",   "EIO",   
-                   "ENXIO",   "E2BIG",   "ENOEXEC", "EBADF",   "ECHILD",  
-                   "EAGAIN",  "ENOMEM",  "EACCES",  "EFAULT",  "ENOTBLK", 
-                   "EBUSY",   "EEXIST",  "EXDEV",   "ENODEV",  "ENOTDIR", 
-                   "EISDIR",  "EINVAL",  "ENFILE",  "EMFILE",  "ENOTTY",  
-                   "ETXTBSY", "EFBIG",   "ENOSPC",  "ESPIPE",  "EROFS",   
-                   "EMLINK",  "EPIPE",   "EDOM",    "ERANGE"               };
 
-char *emsg[]={ 
-        "",
-        "Operation not permitted", 
-        "No such file or directory",
-        "No such process",
-        "Interrupted system call",
-        "I/O error",
-        "No such device or address",
-        "Argument list too long",
-        "Exec format error",
-        "Bad file number",
-        "No child processes",
-        "Try again",
-        "Out of memory",
-        "Permission denied",
-        "Bad address",
-        "Block device required",
-        "Device or resource busy",
-        "File exists",
-        "Cross-device link",
-        "No such device",
-        "Not a directory",
-        "Is a directory",
-        "Invalid argument",
-        "File table overflow",
-        "Too many open files",
-        "Not a typewriter",
-        "Text file busy",
-        "File too large",
-        "No space left on device",
-        "Illegal seek",
-        "Read-only file system",
-        "Too many links"
-        "Broken pipe",
-        "Math argument out of domain of func",
-        "Math result not representable"
+/*
+ * If the macro USE_ERROR_H is defined, the errno, its
+ * text symbol and description will all be included in
+ * the abort report. 
+ */
+#ifdef USE_ERRNO_H
+
+struct error_info {
+        char *t;
+        char *m;
+};
+
+struct error_info e[] = {
+        {"_"      , "_"},
+        {"EPERM"  , "Operation not permitted"},
+        {"ENOENT" , "No such file or directory"},
+        {"ESRCH"  , "No such process"},
+        {"EINTR"  , "Interrupted system call"},
+        {"EIO"    , "I/O error"},
+        {"ENXIO"  , "No such device or address"},
+        {"E2BIG"  , "Argument list too long"},
+        {"ENOEXEC", "Exec format error"},
+        {"EBADF"  , "Bad file number"},
+        {"ECHILD" , "No child processes"},
+        {"EAGAIN" , "Try again"},
+        {"ENOMEM" , "Out of memory"},
+        {"EACCES" , "Permission denied"},
+        {"EFAULT" , "Bad address"},
+        {"ENOTBLK", "Block device required"},
+        {"EBUSY"  , "Device or resource busy"},
+        {"EEXIST" , "File exists"},
+        {"EXDEV"  , "Cross-device link"},
+        {"ENODEV" , "No such device"},
+        {"ENOTDIR", "Not a directory"},
+        {"EISDIR" , "Is a directory"},
+        {"EINVAL" , "Invalid argument"},
+        {"ENFILE" , "File table overflow"},
+        {"EMFILE" , "Too many open files"},
+        {"ENOTTY" , "Not a typewriter"},
+        {"ETXTBSY", "Text file busy"},
+        {"EFBIG"  , "File too large"},
+        {"ENOSPC" , "No space left on device"},
+        {"ESPIPE" , "Illegal seek"},
+        {"EROFS"  , "Read-only file system"},
+        {"EMLINK" , "Too many links"},
+        {"EPIPE"  , "Broken pipe"},
+        {"EDOM"   , "Math argument out of domain of func"},
+        {"ERANGE" , "Math result not representable"}
 };
 
 /**
@@ -71,8 +76,8 @@ int err(int number)
         return -1;
 }
 
-
 #endif /* USE_ERRNO_H */
+
 
 
 /**
@@ -83,7 +88,7 @@ int err(int number)
  * @fmt: a printf-style format string
  * @...: the variable argument list to the format string
  */
-int abort_report(const char *fmt, ...)
+void abort_report(const char *fmt, ...)
 {
         char buf[1000];
         va_list args;
@@ -95,14 +100,12 @@ int abort_report(const char *fmt, ...)
 
         #ifdef USE_ERRNO_H
         if (errno)
-                fprintf(stderr, "%s (%d): %s\n", etag[errno],errno,emsg[errno]);
+                fprintf(stderr, "%s (%d): %s\n", e[errno].t,errno,e[errno].m);
         #endif
 
         fprintf(stderr, "The handler reported: \"%s\"\n", buf);
 
         exit(1);
-
-        return 1;
 }
 
 
@@ -115,7 +118,7 @@ int abort_report(const char *fmt, ...)
  * @fmt  : printf-style format string.
  * @...  : the variable argument list to the format string.
  */
-int raise_report(int signo, const char *fmt, ...)
+void raise_report(int signo, const char *fmt, ...)
 {
         char buf[1000];
         va_list args;
@@ -127,14 +130,35 @@ int raise_report(int signo, const char *fmt, ...)
 
         #ifdef USE_ERRNO_H
         if (errno)
-                fprintf(stderr, "%s (%d): %s\n", etag[errno],errno,emsg[errno]);
+                fprintf(stderr, "%s (%d): %s\n", e[errno].t,errno,e[errno].m);
         #endif
 
         fprintf(stderr, "The handler reported: \"%s\"\n", buf);
 
         raise(signo);
+}
 
-        return 1; 
+
+/**
+ * debug_report 
+ * ````````````
+ * Print a formatted report to stderr and raise a signal.
+ *
+ * @signo: POSIX signal number to raise.
+ * @fmt  : printf-style format string.
+ * @...  : the variable argument list to the format string.
+ */
+void debug_report(const char *fmt, ...)
+{
+        char buf[1000];
+        va_list args;
+
+        /* Write formatted output to stream */
+        va_start(args, fmt);
+        vsprintf(buf, fmt, args);
+        va_end(args);
+
+        fprintf(stderr, "%s\n", buf);
 }
 
 
