@@ -29,7 +29,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#include "error.h"
+#include "debug.h"
 #include "textutils.h"
 
 

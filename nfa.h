@@ -57,5 +57,7 @@ void free_nfa(void);
 struct set_t *e_closure(struct set_t *input, char **accept, int *anchor);
 struct set_t *move(struct set_t *inp_set, int c);
 
+void print_nfa(struct nfa_t *nfa, int len, struct nfa_t *start);
+
 #endif
 

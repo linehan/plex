@@ -26,7 +26,7 @@
 #include <limits.h>
 #include <assert.h>
 #include <stdint.h>
-#include "error.h"
+#include "debug.h"
 
 static inline unsigned djb2_hash(const char *str);
 static inline unsigned sdbm_hash(const char *str);

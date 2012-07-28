@@ -1,7 +1,7 @@
 #ifndef _STACK_H
 #define _STACK_H
 
-#include "error.h"
+#include "debug.h"
 
 /* stack.h
  * ```````

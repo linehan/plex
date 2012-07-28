@@ -45,12 +45,10 @@ void argv_print(int argc, char *argv[]);
 #define memmem  textutils_memmem
 #define strstr  textutils_strstr 
 #define memchr  textutils_memchr
-#define getline textutils_getline
 
 void *textutils_memmem(const void *haystack, const void *needle);
 char *textutils_strstr(const char *haystack, const char *needle);
 void *textutils_memchr(const void *src_void, int c, size_t len);
-int   textutils_getline(char **dest, int n, FILE *stream);
 
 /* Nice macros -------------------------------------------------------------- */
 

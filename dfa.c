@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "lib/error.h"
+#include "lib/debug.h"
 #include "dfa.h"
 #include "nfa.h"
 
@@ -34,6 +34,8 @@ int dfa(struct pgen_t *pgen, struct dfa_table_row **tab, struct accept_t **acc)
         struct accept_t *accept_states;
         int start;
         int i;
+
+        ENTER("dfa");
 
         /* Build the NFA */
         start = nfa(pgen->in);
@@ -70,6 +72,8 @@ int dfa(struct pgen_t *pgen, struct dfa_table_row **tab, struct accept_t **acc)
         *tab = DFA->trans;
         *acc = accept_states;
 
+        LEAVE("dfa");
+
         return DFA->nstates;
 }
 
@@ -79,6 +83,8 @@ int add_to_dstates(struct set_t *NFA_set, char *accept_string, int anchor)
 {
         int nextstate;
 
+        ENTER("add_to_dstates");
+
 	if (DFA->nstates > (DFA_MAX-1))
 	    halt(SIGABRT, "Too many DFA states\n");
 
@@ -86,6 +92,8 @@ int add_to_dstates(struct set_t *NFA_set, char *accept_string, int anchor)
 	DFA->state[nextstate].set    = NFA_set;
 	DFA->state[nextstate].accept = accept_string;
 	DFA->state[nextstate].anchor = anchor;
+
+        LEAVE("add_to_dstates");
 
 	return nextstate;
 }
@@ -102,10 +110,14 @@ int in_dstates(struct set_t *NFA_set)
         struct dfa_state *p;
         struct dfa_state *end = &DFA->state[DFA->nstates];
 
+        ENTER("in_dstates");
+
         for (p=DFA->state; p<end; ++p) {
 	        if (IS_EQUIVALENT(NFA_set, p->set))
 	                return (p - DFA->state);
         }
+
+        LEAVE("in_dstates");
 
         return -1;
 }
@@ -156,6 +168,8 @@ void make_dtran(int sstate)
         int anchor;                // anchor, if any
         int c;                     //input char
 
+        ENTER("make_dtran");
+
         /* 
          * Initially Dstates contains a single, unmarked, start state 
          * formed by taking the epsilon closure of the NFA start state. 
@@ -194,5 +208,7 @@ void make_dtran(int sstate)
 
         /* Free the memory used for the DFA_STATE sets */
         free_sets(); 
+
+        LEAVE("make_dtran");
 }
 

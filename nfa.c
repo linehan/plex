@@ -2,10 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include "lib/error.h"
+#include "lib/debug.h"
 #include "lib/map.h"
 #include "lib/set.h"
 
+#include "lib/stack.h"
 #include "nfa.h"
 #include "lex.h"
 
@@ -268,11 +269,13 @@ void free_nfa(void)
  */
 struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
 {
-        int  stack[NFA_MAX]; // Stack of untested states
-        int  *tos;           // Stack pointer
         struct nfa_t *p;     // NFA state being examined	
         int  i;              // State number of "	
         int  accept_num = LARGEST_INT;
+
+        ENTER("e_closure");
+
+        new_stack(stack, int, NFA_MAX);
 
         if (!input)
 	        goto abort;
@@ -292,15 +295,14 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
 
         /* 0 */
         *accept = NULL; 
-        tos     = &stack[-1];
 
         for (next_member(NULL); (i=next_member(input)) >= 0;)
-	        *++tos = i;
+                push(stack, i);
 
         /* 1 */
-        while (INBOUNDS(stack,tos))	{
+        while (!stack_empty(stack)) {
                 /* 2 */
-	        i = *tos--;
+	        i = pop(stack);
 	        p = &nfa_state[i];
 
 	        if (p->accept && (i < accept_num)) {
@@ -318,7 +320,7 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
                                         /* 5 */
                                         ADD(input, i);
                                         /* 6 */
-                                        *++tos = i;
+                                        push(stack, i);
                                 }
 	                }
                         if (p->next2) {
@@ -326,14 +328,15 @@ struct set_t *e_closure(struct set_t *input, char **accept, int *anchor)
                                 i = p->next2 - nfa_base;
                                 if (!MEMBER(input, i)) {
                                         /* 5 */
-                                        ADD( input, i);
+                                        ADD(input, i);
                                         /* 6 */
-                                        *++tos = i;
+                                        push(stack, i);
                                 }
                         }
 	        }
         }
         abort:
+                LEAVE("e_closure");
                 return input;
 }
 
@@ -353,6 +356,8 @@ struct set_t *move(struct set_t *inp_set, int c)
         struct nfa_t *p;             // Current NFA state
         int i;
 
+        ENTER("move");
+
         for (i = nfa_nstates; --i >= 0;) {
 	        if (MEMBER(inp_set, i)) {
 	                p = &nfa_state[i];
@@ -365,7 +370,95 @@ struct set_t *move(struct set_t *inp_set, int c)
                         }
 	        }
         }
+        LEAVE("move");
         return(outset);
+}
+
+
+/**
+ * printccl 
+ * ````````
+ * Print a collection of characters. 
+ */
+void printccl(struct set_t *set)
+{
+        static int i;
+
+        putchar('[');
+        for (i=0; i<=0x7f; i++) {
+                if (TEST(set, i)) {
+                        if (i < ' ')
+                                printf("^%c", i + '@');
+                        else
+                                printf("%c", i);
+                }
+        }
+        putchar(']');
+}
+
+/**
+ * print_label 
+ * ```````````
+ * Return buffer containing state number. Buffer is overwritten on each call.
+ */
+char *print_label(struct nfa_t *nfa, struct nfa_t *state)
+{
+        static char buf[32];
+
+        if (!nfa || !state)
+                return("--");
+
+        sprintf(buf, "%2ld", (long)(state - nfa));
+        return (buf);
+}
+
+/**
+ * print_nfa
+ * `````````
+ * Print an NFA in human-readable form.
+ */
+void print_nfa(struct nfa_t *nfa, int len, struct nfa_t *start)
+{
+        struct nfa_t *s;
+
+        s = nfa;
+
+        printf("\n-------------- NFA ---------------\n");
+
+        for (; --len >= 0 ; nfa++) {
+	        printf("NFA state %s: ", print_label(s, nfa));
+
+	        if (!nfa->next)
+	                printf("(TERMINAL)");
+	        else {
+                        printf("--> %s ", print_label(s, nfa->next));
+                        printf("(%s) on ", print_label(s, nfa->next2));
+
+                        switch (nfa->edge)
+                        {
+                        case CCL:     
+                                printccl(nfa->bitset);	
+                                break;
+                        case EPSILON: 
+                                printf("EPSILON ");	
+                                break;
+                        default:      
+                                putc(nfa->edge, stdout); 
+                                break;
+                        }
+	        }
+
+	        if (nfa == start)
+	                printf(" (START STATE)");
+
+	        if (nfa->accept)
+	                printf(" accepting %s<%s>%s", 
+                               nfa->anchor & START ? "^" : "",
+			       nfa->accept,
+                               nfa->anchor & END   ? "$" : "" );
+	                printf("\n");
+        }
+        printf( "\n-------------------------------------\n" );
 }
 
 

@@ -4,14 +4,13 @@
 #include <stdbool.h>
 
 #include "lib/textutils.h"
-#include "lib/error.h"
+#include "lib/debug.h"
 #include "lib/set.h"
 #include "lib/stack.h"
 #include "nfa.h"
 #include "main.h"
 #include "macro.h"
 #include "lex.h"
-
 
 
 /**
@@ -24,6 +23,8 @@ struct nfa_t *machine(struct lexer_t *lex)
         struct nfa_t *start;
         struct nfa_t *p;
 
+        ENTER("machine");
+
         p = start = new_nfa();
         p->next   = rule(lex);
 
@@ -32,6 +33,8 @@ struct nfa_t *machine(struct lexer_t *lex)
                 p        = p->next2;
                 p->next  = rule(lex);
         }
+
+        LEAVE("machine");
 
         return start;
 }
@@ -67,6 +70,8 @@ enum token_t advance(struct lexer_t *lex)
         static bool in_quote = false; // When processing a quoted string.
         bool saw_escape;              // Saw a backslash escape
 
+        ENTER("advance");
+
         new_stack(stack, char *, 32);
 
         /* 
@@ -76,7 +81,7 @@ enum token_t advance(struct lexer_t *lex)
         if (lex->token == EOS) {
 
 	        if (in_quote)
-	                halt(SIGABRT, "No newline.");
+	                parse_err(lex, E_NEWLINE);
 
                 /* Loop until a non-blank line is read. */
 	        do {
@@ -87,7 +92,7 @@ enum token_t advance(struct lexer_t *lex)
 	                while (isspace(*lex->position))
 		                lex->position++;
 
-	        } while (!*lex->position); /* Ignore blank lines. */
+	        } while (*lex->position == '\n'); /* Ignore blank lines. */
 
                 /* Set the start of the line to the end of the whitespace. */
 	        lex->line = lex->position; 
@@ -128,7 +133,7 @@ enum token_t advance(struct lexer_t *lex)
 	                lex->position = get_macro(stack_p(stack)); 
 
 	                if (stack_full(stack))
-		                halt(SIGABRT, "Stack overflow"); 
+		                parse_err(lex, E_MACDEPTH); 
 	        }
         }
 
@@ -166,7 +171,10 @@ enum token_t advance(struct lexer_t *lex)
 
         lex->token = (in_quote || saw_escape) ? L : TOKEN_MAP[lex->lexeme];
 
+        printf("lexeme: %c token: %d\n", lex->lexeme, TOKEN_MAP[lex->lexeme]);
+
         exit:
+                LEAVE("advance");
                 return lex->token;
 }
 
@@ -206,6 +214,8 @@ enum token_t advance(struct lexer_t *lex)
  */
 struct nfa_t *rule(struct lexer_t *lex)
 {
+        ENTER("rule");
+
         struct nfa_t *start = NULL;
         struct nfa_t *end   = NULL;
         int anchor = NONE;
@@ -230,20 +240,24 @@ struct nfa_t *rule(struct lexer_t *lex)
                 end->edge = CCL;
 
                 if (!(end->bitset = new_set()))
-                        halt(SIGABRT, "Out of memory.");
+                        parse_err(lex, E_MEM);
 
                 ADD(end->bitset, '\n');
 
                 end     = end->next;
                 anchor |= END;
         }
-
-        while (isspace(*lex->position))
-	        lex->line++;
+        /* Skip any spaces */
+        while (isspace(*lex->position)) {
+                lex->position++;
+        }
+        lex->line = lex->position;
 
         end->accept = save(lex->position);
         end->anchor = anchor;
         advance(lex); // Skip past EOS
+
+        LEAVE("rule");
 
         return start;
 }
@@ -278,6 +292,8 @@ void expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
         struct nfa_t *e2_end   = NULL;
         struct nfa_t *p;
 
+        ENTER("expr");
+
         cat_expr(lex, startp, endp);
 
         while (lex->token == OR) {
@@ -294,6 +310,8 @@ void expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 	        e2_end ->next = p;
 	        *endp = p;
         }
+
+        LEAVE("expr");
 }
 
 
@@ -317,10 +335,12 @@ void cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
         struct nfa_t *e2_start;
         struct nfa_t *e2_end;
 
-        if (first_in_cat(lex->token))
+        ENTER("cat_expr");
+
+        if (first_in_cat(lex))
 	        factor(lex, startp, endp);
 
-        while (first_in_cat(lex->token)) {
+        while (first_in_cat(lex)) {
 	        factor(lex, &e2_start, &e2_end);
 
 	        memcpy(*endp, e2_start, sizeof(struct nfa_t));
@@ -328,13 +348,19 @@ void cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 
 	        *endp = e2_end;
         }
+
+        LEAVE("cat_expr");
 }
 
 
 
-int first_in_cat(enum token_t tok)
+int first_in_cat(struct lexer_t *lex)
 {
-        switch ((int)tok) 
+        int retval = 1;
+
+        ENTER("first_in_cat");
+
+        switch ((int)lex->token) 
         {
         case CLOSE_PAREN:
         case AT_EOL:
@@ -345,20 +371,21 @@ int first_in_cat(enum token_t tok)
         case CLOSURE:
         case PLUS_CLOSE:
         case OPTIONAL:
-                /*halt(SIGABRT, "Bad closure?");*/
-                DEBUG("Bad closure?\n");
+                parse_err(lex, E_CLOSE);
                 return 0;
 
         case CCL_END:
-                DEBUG("Brackets ending.\n");
-                /*halt(SIGABRT, "Bracket problems.");*/
+                parse_err(lex, E_BRACKET);
                 return 0;
 
         case AT_BOL:
-                DEBUG("Beginning of line.\n");
-                /*halt(SIGABRT, "Beginning of line.");*/
+                parse_err(lex, E_BOL);
                 return 0;
+        default: 
+                break;
         }
+
+        LEAVE("first_in_cat");
 
         return 1;
 }
@@ -371,6 +398,8 @@ void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 {
         struct nfa_t *start;
         struct nfa_t *end;
+
+        ENTER("factor");
 
         term(lex, startp, endp);
 
@@ -396,6 +425,8 @@ void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
                 *endp    = end;
                 advance(lex);
         }
+
+        LEAVE("factor");
 }
 
 
@@ -413,13 +444,15 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
         struct nfa_t *start;
         int c;
 
+        ENTER("term");
+
         if (lex->token == OPEN_PAREN) {
 	        advance(lex);
 	        expr(lex, startp, endp);
 	        if (lex->token == CLOSE_PAREN)
 	                advance(lex);
 	        else
-	                halt(SIGABRT, "Parenthesis are rotten.");	
+                        parse_err(lex, E_PAREN);
         } else {
 	        *startp = start = new_nfa();
 	        *endp   = start->next = new_nfa();
@@ -431,7 +464,7 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
                         start->edge = CCL;
 
                         if (!(start->bitset = new_set()))
-                                halt(SIGABRT, "Out of memory.");	
+                                parse_err(lex, E_MEM);
 
                         /* dot (.) */
                         if (lex->token == ANY) {
@@ -459,6 +492,8 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
                         advance(lex);
                 }
         }
+
+        LEAVE("term");
 }
 
 
@@ -466,6 +501,8 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 void dodash(struct lexer_t *lex, struct set_t *set)
 {
         register int first = 0;
+
+        ENTER("dodash");
 
         /* Treat [-...] as a literal dash, but print a warning. */
         if (lex->token == DASH) {		
@@ -489,5 +526,10 @@ void dodash(struct lexer_t *lex, struct set_t *set)
                         }
 	        }
 	}
+
+        LEAVE("dodash");
 }
+
+
+
 

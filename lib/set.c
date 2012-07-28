@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <signal.h>
 #include <string.h>
-#include "error.h"
+#include "debug.h"
 
 #include "set.h"
 

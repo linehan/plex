@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#include "lib/error.h"
+#include "lib/debug.h"
 #include "lib/textutils.h"
 #include "lib/file.h"
 #include "scan.h"

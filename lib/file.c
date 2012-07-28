@@ -17,7 +17,7 @@
 #include <libgen.h>
 
 #include "file.h"
-#include "error.h"
+#include "debug.h"
 #include "util.h"
 #include "textutils.h"
 

@@ -4,7 +4,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-#include "lib/error.h"
+#include "lib/debug.h"
 #include "lib/textutils.h"
 #include "macro.h"
 #include "main.h"
