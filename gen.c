@@ -141,10 +141,10 @@ void pdriver(FILE *output, int nrows, struct accept_t *accept)
  * @nrows: number of rows in array[]
  * @ncols: number of cols in array[]
  */
-void print_array(FILE *fp, int *array, int nrows, int ncols)
+void print_array(FILE *fp, int **array, int nrows, int ncols)
 {
         #define NCOLS 10 // Num. columns used to print arrays
-        int col; // Output column.
+        int j; // Output column.
         int i;
 
         fprintf(fp, "{\n");
@@ -152,16 +152,16 @@ void print_array(FILE *fp, int *array, int nrows, int ncols)
         for(i=0; i<nrows; i++) {
 	        fprintf(fp, "/* %02d */  { ", i);
 
-	        for (col=0; col<ncols; col++) {
-	                fprintf(fp, "%3d" , *array++);
-	                if (col < ncols-1)
+	        for (j=0; j<ncols; j++) {
+	                fprintf(fp, "%3d" , array[i][j]);
+	                if (j < ncols-1)
 		                fprintf(fp, ", ");
 
-	                if ((col % NCOLS)==NCOLS-1 && col!=ncols-1)
+	                if ((j % NCOLS)==NCOLS-1 && j!=ncols-1)
 		                fprintf(fp, "\n            ");
 	        }
 
-	        if (col > NCOLS)
+	        if (j > NCOLS)
 	                fprintf(fp,  "\n         ");
 
 	        fprintf(fp, " }%c\n", i < nrows-1 ? ',' : ' ');

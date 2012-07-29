@@ -209,7 +209,7 @@ struct nfa_t *thompson(FILE *input)
 struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
 {
         new_stack(stack, int, NFA_MAX);
-        static int accept_num = 0xdeadbeef;
+        int accept_num = 0xdeadbeef;
         struct nfa_state *accept = NULL;
         struct nfa_state *p;  
         int i;               
@@ -224,7 +224,7 @@ struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
          */
         next_member(NULL);
 
-        while ((i = next_member(input)))
+        while ((i = next_member(input)) != -1)
                 push(stack, i);
 
         /* 
@@ -321,7 +321,7 @@ struct set_t *move(struct nfa_t *nfa, struct set_t *input, int c)
                         {
                                 /* Create the output set */
                                 if (!output)
-                                        output = new_set(1024);
+                                        output = new_set(255);
 
                                 /* Add NFA state i to the output set. */
                                 set_add(output, p->next->id);

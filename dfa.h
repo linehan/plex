@@ -18,8 +18,40 @@ struct accept_t {
 };
 
 
+/**
+ * A DFA state comprises the machine state after a given set of transitions. 
+ * 
+ * @mark  : Used by make_dtran
+ * @accept: Action if accepting state.
+ * @anchor: Anchor point if accepting state.
+ * @set   : Set of NFA states represented by this DFA state.
+ */
+struct dfa_state {
+        int id;
+        bool mark; 
+        char *accept;   
+        int anchor;
+        struct set_t *bitset;
+};
 
-int dfa(struct pgen_t *pgen, int ***table, struct accept_t **acc);
+
+/**
+ * A deterministic finite automaton.
+ *
+ * @state     : Array of DFA state nodes.
+ * @prev_state: Previous state node.
+ */
+struct dfa_t {
+        struct dfa_state *start;
+        struct dfa_state **state;
+        int **trans;
+        int n;
+        int max;
+};
+
+
+
+struct dfa_t *subset(struct pgen_t *pgen, struct accept_t **accept);
 
 
 #endif 

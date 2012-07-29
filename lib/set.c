@@ -305,7 +305,7 @@ int next_member(struct set_t *set)
                 if (set_contains(set, current-1))
                         return (current-1);
         }
-        return (-1);
+        return -1;
 }
 
 

@@ -12,6 +12,23 @@
 #include "macro.h"
 #include "lex.h"
 
+/******************************************************************************
+ * Lexer/Parser
+ *
+ * This module implements a lexer and parser for the language used in the
+ * grammar files that form the input of this program.
+ * 
+ * A grammar file specifies a grammar, which the parser-generator (this
+ * program) transforms into a finite automaton that accepts the language
+ * produced by the grammar.
+ *
+ * The specification of that grammar is itself a grammar, however, and so
+ * even the parser-generator must contain a lexer and parser, with which
+ * it can translate the input file into tokens that will be used in the
+ * construction of the automata.
+ *
+ *****************************************************************************/
+
 
 /******************************************************************************
  * FORWARD REFERENCES 

@@ -22,71 +22,29 @@
  */
 void flex(struct pgen_t *pgen)
 {
-        int **dtrans;
+        struct dfa_t *dfa;
         struct accept_t *accept;
-        int nstates;
 
         /* Print the input file header */
         scan_head(pgen);
 
         /* Construct the DFA */
-        nstates = dfa(pgen, &dtrans, &accept);
-
-        /*struct nfa_t *nfa = thompson(pgen->in);*/
-
-        /*print_nfa(nfa);*/
-
-        /*___BREAKPOINT___;*/
+        dfa = subset(pgen, &accept);
 
         /* Print the DFA transition table to the output stream. */
         fprintf(pgen->out,
-                "YYPRIVATE YY_TTYPE  %s[ %d ][ %d ] =\n", 
-                DTRAN_NAME, nstates, MAX_CHARS);
+                "YYPRIVATE YY_TTYPE  %s[%d][%d] =\n", 
+                DTRAN_NAME, dfa->n, dfa->max);
 
         /* Print the DFA array to the output stream. */
-	print_array(pgen->out, (int *)dtrans, nstates, MAX_CHARS);
+	print_array(pgen->out, dfa->trans, dfa->n, MAX_CHARS);
 
 	defnext(pgen->out, DTRAN_NAME);
 
         /* Print the rest of the driver and everyting after the second %% */
-	pdriver(pgen->out, nstates, accept);	
+	pdriver(pgen->out, dfa->n, accept);	
 
-	scan_tail(pgen);	
-}
-
-
-void test(FILE *in)
-{
-        int pos;
-        char *line = NULL;
-        size_t len = 0;
-        int i;
-
-        char *str[]={
-                "Test string.",
-                "Another.",
-                "This is a test.",
-                "On that knight no finer plumage could be found.",
-                "When you must print a lot of paper fast."
-        };
-
-        struct rb_tree *tree = rb_new();
-
-        for (i=0; i<5; i++) {
-                rb_store(tree, i, str[i]);
-        }
-
-        while (i-->0) {
-                printf("%d: %s\n", i, (char *)rb_extra(tree, i));
-        }
-
-        halt(SIGABRT, "BREAKPOINT");
-
-        while ((pos = getstr(&line, &len, in)) != EOF) {
-                printf("%s\n", line);
-        }
-
-        halt(SIGABRT, "BREAKPOINT\n");
+	scan_tail(pgen);
 }
 
 
