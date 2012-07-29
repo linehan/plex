@@ -13,37 +13,92 @@
 #include "lex.h"
 
 
+/******************************************************************************
+ * FORWARD REFERENCES 
+ ******************************************************************************/
+
+
+enum token_t   advance(struct lexer_t *lex);
+struct nfa_state *rule(struct lexer_t *lex);
+void              expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
+void          cat_expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
+int       first_in_cat(struct lexer_t *lex);
+void            factor(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
+void              term(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
+void            dodash(struct lexer_t *lex, struct set_t *set);
+
+
+/******************************************************************************
+ * LEXER OBJECT
+ ******************************************************************************/
+
+
+/**
+ * new_lexer
+ * `````````
+ * Allocates and initializes the lexer object.
+ *
+ * @input       : Stream pointer to input file to be lexed.
+ * @max_linesize: Maximum number of characters per line.
+ * @max_states  : Maximum number of NFA states.
+ * Return       : Pointer to a lexer object.
+ */
+struct lexer_t *new_lexer(FILE *input, int max_linesize, int max_states)
+{
+        struct lexer_t *new;
+        new = malloc(sizeof(struct lexer_t)); 
+
+        /* Check and connect the input file to be lexed. */
+        if (input) 
+                new->input_file = input;
+        else       
+                halt(SIGABRT, "Bad input file.\n");
+
+        /* Create the NFA object and line buffer. */
+        new->nfa  = new_nfa(max_states);
+        new->line = calloc(max_linesize, sizeof(char));
+        new->size = max_linesize;
+
+        /* Load the first token. */
+        new->token = EOS;
+        advance(new);
+
+        return new;
+}
+
+
+/******************************************************************************
+ * ENTRY POINT 
+ ******************************************************************************/
+
 /**
  * machine (entry)
  * ```````
  * Build the NFA state machine.
  */
-struct nfa_t *machine(struct lexer_t *lex)
+void machine(struct lexer_t *lex)
 {
-        struct nfa_t *start;
-        struct nfa_t *p;
+        struct nfa_state *state;
 
         ENTER("machine");
 
-        p = start = new_nfa();
-        p->next   = rule(lex);
+        state       = new_nfa_state(lex->nfa);
+        state->next = rule(lex);
 
         while (lex->token != END_OF_INPUT) {
-                p->next2 = new_nfa();
-                p        = p->next2;
-                p->next  = rule(lex);
+                state->next2 = new_nfa_state(lex->nfa);
+                state        = state->next2;
+                state->next  = rule(lex);
         }
 
         LEAVE("machine");
-
-        return start;
 }
 
 
-
 /******************************************************************************
- * Lexical analyzer.
+ * LEXICAL ANALYZER.
  ******************************************************************************/
+
 
 /**
  * advance
@@ -212,17 +267,17 @@ enum token_t advance(struct lexer_t *lex)
  *	action	--> <tabs> <string of characters>
  *		    epsilon
  */
-struct nfa_t *rule(struct lexer_t *lex)
+struct nfa_state *rule(struct lexer_t *lex)
 {
         ENTER("rule");
 
-        struct nfa_t *start = NULL;
-        struct nfa_t *end   = NULL;
+        struct nfa_state *start = NULL;
+        struct nfa_state *end   = NULL;
         int anchor = NONE;
 
         if (lex->token == AT_BOL) {
-    	        start 	     =  new_nfa();
-	        start->edge  =  '\n';
+    	        start 	     = new_nfa_state(lex->nfa);
+	        start->edge  = '\n';
 	        anchor      |= START;
 	        advance(lex);
 	        expr(lex, &start->next, &end);
@@ -236,13 +291,13 @@ struct nfa_t *rule(struct lexer_t *lex)
          */
         if (lex->token == AT_EOL) {
                 advance(lex);
-                end->next = new_nfa();
+                end->next = new_nfa_state(lex->nfa);
                 end->edge = CCL;
 
-                if (!(end->bitset = new_set()))
+                if (!(end->bitset = new_set(1024)))
                         parse_err(lex, E_MEM);
 
-                ADD(end->bitset, '\n');
+                set_add(end->bitset, '\n');
 
                 end     = end->next;
                 anchor |= END;
@@ -286,11 +341,11 @@ struct nfa_t *rule(struct lexer_t *lex)
  *		cat_expr
  *		do the OR
  */
-void expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
+void expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
-        struct nfa_t *e2_start = NULL; /* expression to right of | */
-        struct nfa_t *e2_end   = NULL;
-        struct nfa_t *p;
+        struct nfa_state *e2_start = NULL; /* expression to right of | */
+        struct nfa_state *e2_end   = NULL;
+        struct nfa_state *p;
 
         ENTER("expr");
 
@@ -300,12 +355,12 @@ void expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 	        advance(lex);
 	        cat_expr(lex, &e2_start, &e2_end);
 
-	        p = new_nfa();
+	        p = new_nfa_state(lex->nfa);
 	        p->next2 = e2_start;
 	        p->next  = *startp;
 	        *startp  = p;
 
-	        p = new_nfa();
+	        p = new_nfa_state(lex->nfa);
 	        (*endp)->next = p;
 	        e2_end ->next = p;
 	        *endp = p;
@@ -330,10 +385,10 @@ void expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
  *	cat_expr' -> | factor cat_expr'
  *		     epsilon
  */
-void cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
+void cat_expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
-        struct nfa_t *e2_start;
-        struct nfa_t *e2_end;
+        struct nfa_state *e2_start;
+        struct nfa_state *e2_end;
 
         ENTER("cat_expr");
 
@@ -343,7 +398,7 @@ void cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
         while (first_in_cat(lex)) {
 	        factor(lex, &e2_start, &e2_end);
 
-	        memcpy(*endp, e2_start, sizeof(struct nfa_t));
+	        memcpy(*endp, e2_start, sizeof(struct nfa_state));
 	        del_nfa(e2_start);
 
 	        *endp = e2_end;
@@ -356,8 +411,6 @@ void cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 
 int first_in_cat(struct lexer_t *lex)
 {
-        int retval = 1;
-
         ENTER("first_in_cat");
 
         switch ((int)lex->token) 
@@ -394,10 +447,10 @@ int first_in_cat(struct lexer_t *lex)
 /**		
  * factor --> term*  | term+  | term?
  */
-void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
+void factor(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
-        struct nfa_t *start;
-        struct nfa_t *end;
+        struct nfa_state *start;
+        struct nfa_state *end;
 
         ENTER("factor");
 
@@ -407,8 +460,8 @@ void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
         ||  lex->token == PLUS_CLOSE 
         ||  lex->token == OPTIONAL) 
         {
-	        start = new_nfa();
-	        end   = new_nfa();
+	        start = new_nfa_state(lex->nfa);
+	        end   = new_nfa_state(lex->nfa);
 	        start->next = *startp;
 	        (*endp)->next = end;
 
@@ -439,9 +492,9 @@ void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
  * but not a carriage return (\r). All of these are single nodes in the
  * NFA.
  */
-void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
+void term(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
-        struct nfa_t *start;
+        struct nfa_state *start;
         int c;
 
         ENTER("term");
@@ -454,8 +507,8 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
 	        else
                         parse_err(lex, E_PAREN);
         } else {
-	        *startp = start = new_nfa();
-	        *endp   = start->next = new_nfa();
+	        *startp = start = new_nfa_state(lex->nfa);
+	        *endp   = start->next = new_nfa_state(lex->nfa);
 
                 if (!(lex->token == ANY || lex->token == CCL_START)) {
                         start->edge = lex->lexeme;
@@ -463,13 +516,13 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
                 } else {
                         start->edge = CCL;
 
-                        if (!(start->bitset = new_set()))
+                        if (!(start->bitset = new_set(1024)))
                                 parse_err(lex, E_MEM);
 
                         /* dot (.) */
                         if (lex->token == ANY) {
-                                ADD(start->bitset, '\n');
-                                COMPLEMENT(start->bitset);
+                                set_add(start->bitset, '\n');
+                                set_complement(start->bitset);
                         } else {
                                 advance(lex);
                                 /* Negative character class */
@@ -477,16 +530,16 @@ void term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp)
                                         advance(lex);
 
                                         /* Don't include \n in class */
-                                        ADD(start->bitset, '\n');
+                                        set_add(start->bitset, '\n');
 
-                                        COMPLEMENT(start->bitset);
+                                        set_complement(start->bitset);
                                 }
 
                                 if (lex->token != CCL_END) {
                                         dodash(lex, start->bitset);
                                 } else { // [] or [^]
                                         for (c=0; c<=' '; ++c)
-                                                ADD(start->bitset, c);
+                                                set_add(start->bitset, c);
                                 }
                         }
                         advance(lex);
@@ -506,23 +559,23 @@ void dodash(struct lexer_t *lex, struct set_t *set)
 
         /* Treat [-...] as a literal dash, but print a warning. */
         if (lex->token == DASH) {		
-	        ADD(set, lex->lexeme);
+	        set_add(set, lex->lexeme);
 	        advance(lex);
         }
 
         for (; lex->token != EOS && lex->token != CCL_END; advance(lex)) {
 	        if (lex->token != DASH) {
 	                first = lex->lexeme;
-	                ADD(set, lex->lexeme);
+	                set_add(set, lex->lexeme);
                 /* Looking at a dash */
 	        } else {
 	                advance(lex);
                         /* Treat [...-] as literal */
 	                if (lex->token == CCL_END) {
-		                ADD(set, '-');
+		                set_add(set, '-');
 	                } else {
 		                for (; first<=lex->lexeme; first++)
-		                        ADD(set, first);
+		                        set_add(set, first);
                         }
 	        }
 	}

@@ -20,6 +20,8 @@
                                      : raise_report(sig, __VA_ARGS__)
 
 
+
+
 /*
  * Drop a printf statement with the line number, filename, 
  * and function name (if using GCC) included in the output.
@@ -30,8 +32,8 @@
 #define WHERE_FMT  "%s:%d: "
 #define WHERE_ARG  __FILE__, __LINE__
 
-#define DEBUG_1(...)      fprintf(stderr, WHERE_FMT __VA_ARGS__, WHERE_ARG)
-#define DEBUG_2(fmt, ...) fprintf(stderr, WHERE_FMT fmt, WHERE_ARG, __VA_ARGS__)
+#define DEBUG_1(...)      fprintf(stderr, WHERE_FMT __VA_ARGS__ "\n", WHERE_ARG)
+#define DEBUG_2(fmt, ...) fprintf(stderr, WHERE_FMT fmt "\n", WHERE_ARG, __VA_ARGS__)
 #define DEBUG_3 DEBUG_2
 #define DEBUG_4 DEBUG_2
 #define DEBUG_5 DEBUG_2
@@ -48,10 +50,12 @@
 #define DEBUG(...) /* nothing */
 #define ENTER(f)   /* nothing */
 #define LEAVE(f)   /* nothing */
+#define ___BREAKPOINT___ /* nothing */
 #else
 #define DEBUG(...) _DEBUG(NUM_ARGS(__VA_ARGS__), __VA_ARGS__)
-#define ENTER(f)   DEBUG("Entering %s\n", (f))
-#define LEAVE(f)   DEBUG("Leaving %s\n", (f))
+#define ENTER(f)   DEBUG("Entering %s", (f))
+#define LEAVE(f)   DEBUG("Leaving %s", (f))
+#define ___BREAKPOINT___ DEBUG("Breakpoint") 
 #endif
 
 

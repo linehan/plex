@@ -39,7 +39,7 @@ struct dfa_table_row {
 /**
  * A DFA state comprises the machine state after a given set of transitions. 
  * 
- * @mark: Used by make_dtran
+ * @mark  : Used by make_dtran
  * @accept: Action if accepting state.
  * @anchor: Anchor point if accepting state.
  * @set   : Set of NFA states represented by this DFA state.

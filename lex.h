@@ -4,7 +4,6 @@
 #include "main.h"
 #include "lib/set.h"
 
-
 enum token_t {
         EOS = 1,      // end of string
         ANY,          // .
@@ -26,7 +25,6 @@ enum token_t {
 };
 
 
-
 struct lexer_t {
         size_t size;
         enum token_t token;
@@ -34,21 +32,13 @@ struct lexer_t {
         FILE *input_file;
         char *position;
         char *line;
+        struct nfa_t *nfa;
 };
 
 
+struct lexer_t *new_lexer(FILE *input, int max_linesize, int max_states);
+void              machine(struct lexer_t *lex);
 
-struct nfa_t *machine(struct lexer_t *lex);
-enum token_t  advance(struct lexer_t *lex);
-struct nfa_t    *rule(struct lexer_t *lex);
-
-void        expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
-void    cat_expr(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
-int first_in_cat(struct lexer_t *lex);
-
-void factor(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
-void   term(struct lexer_t *lex, struct nfa_t **startp, struct nfa_t **endp);
-void dodash(struct lexer_t *lex, struct set_t *set);
 
 
 

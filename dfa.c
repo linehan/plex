@@ -14,7 +14,7 @@ int add_to_dstates(struct set_t *NFA_set, char *accept_string, int anchor);
 int in_dstates(struct set_t *NFA_set);
 struct dfa_state *get_unmarked(void);
 void free_sets(void);
-void make_dtran(int sstate);
+void make_dtran(struct nfa_t *nfa);
 
 
 
@@ -32,13 +32,14 @@ void make_dtran(int sstate);
 int dfa(struct pgen_t *pgen, struct dfa_table_row **tab, struct accept_t **acc)
 {
         struct accept_t *accept_states;
+        struct nfa_t *nfa;
         int start;
         int i;
 
         ENTER("dfa");
 
         /* Build the NFA */
-        start = nfa(pgen->in);
+        nfa = thompson(pgen->in);
 
         DFA = calloc(1, sizeof(struct dfa_t));
 
@@ -51,10 +52,9 @@ int dfa(struct pgen_t *pgen, struct dfa_table_row **tab, struct accept_t **acc)
 	        halt(SIGABRT, "No memory for DFA transition matrix!");
 
         /* Convert NFA to DFA */
-        make_dtran(start);
+        make_dtran(nfa->start->id);
 
-        /* Free the NFA memory, but not the accept strings. */
-        free_nfa(); 
+        ___BREAKPOINT___;
 
         /* Build the DFA */
         DFA->trans = realloc(DFA->trans, DFA->nstates * sizeof(struct dfa_table_row));
@@ -113,7 +113,7 @@ int in_dstates(struct set_t *NFA_set)
         ENTER("in_dstates");
 
         for (p=DFA->state; p<end; ++p) {
-	        if (IS_EQUIVALENT(NFA_set, p->set))
+	        if (sets_equivalent(NFA_set, p->set))
 	                return (p - DFA->state);
         }
 
@@ -149,8 +149,6 @@ void free_sets(void)
         struct dfa_state *p;
         struct dfa_state *end = &DFA->state[DFA->nstates];
 
-        for (p=DFA->state; p<end; ++p)
-	        del_set(p->set);
 }
 
 
@@ -159,14 +157,14 @@ void free_sets(void)
  * ``````````
  * @sstate: starting NFA state
  */
-void make_dtran(int sstate)
+void make_dtran(struct nfa_t *nfa)
 {
         struct dfa_state *current; // state currently being expanded
         struct set_t *NFA_set;     // set of NFA states that define next DFA state
         int nextstate;             // goto DFA state for current char
         char *isaccept;            // current DFA state is accept 
         int anchor;                // anchor, if any
-        int c;                     //input char
+        int c;                     // input char
 
         ENTER("make_dtran");
 
@@ -175,11 +173,14 @@ void make_dtran(int sstate)
          * formed by taking the epsilon closure of the NFA start state. 
          * So, Dstates[0] (and DTAB[0]) is the DFA start state.
          */
-        NFA_set = new_set() ;
-        ADD(NFA_set, sstate);
+        NFA_set = new_set(1024) ;
+
+        printf("Fucked up sstate value: %d\n", nfa->start->id);
+
+        set_add(NFA_set, nfa->start->id);
 
         DFA->nstates = 1;
-        DFA->state[0].set  = e_closure(NFA_set,&DFA->state[0].accept,&DFA->state[0].anchor);
+        DFA->state[0].set  = e_closure(nfa, NFA_set, &DFA->state[0].accept, &DFA->state[0].anchor);
         DFA->state[0].mark = 0;
 
         /* Make the table */
@@ -187,16 +188,15 @@ void make_dtran(int sstate)
 
 	        current->mark = 1;
 
-	        for (c=MAX_CHARS; --c>=0;) {
-	                if ((NFA_set = move(current->set, c)))
-		                NFA_set = e_closure(NFA_set, &isaccept, &anchor);
+	        for (c=MAX_CHARS; c-->0;) {
+	                if ((NFA_set = move(nfa, current->set, c)))
+		                NFA_set = e_closure(nfa, NFA_set, &isaccept, &anchor);
 
 	                if (!NFA_set) // No outgoing transitions	
 		                nextstate = F;
 
-	                else if((nextstate = in_dstates(NFA_set)) != -1)
-		                del_set(NFA_set);
-
+	                else if ((nextstate = in_dstates(NFA_set)) != -1)
+		                free(NFA_set);
 	                else
 		                nextstate = add_to_dstates(NFA_set, isaccept, anchor);
 

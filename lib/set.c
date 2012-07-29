@@ -1,431 +1,263 @@
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <limits.h>
 #include <stdio.h>
-#include <ctype.h>
-#include <signal.h>
-#include <string.h>
-#include "debug.h"
 
+#include "debug.h"
 #include "set.h"
+
 
 /**
  * new_set
  * ```````
- * Create a new set. 
- * 
- * Returns: Pointer to an allocated default set.
- */
-struct set_t *new_set(void)
-{
-        struct set_t *new;
-
-        if (!(new = calloc(1, sizeof(struct set_t)))) {
-                halt(SIGABRT, "No memory to create SET.\n");
-                return NULL; // "Shouldn't happen."
-        }
-
-        new->map    = new->defmap;
-        new->nwords = _DEFWORDS;
-        new->nbits  = _DEFBITS;
-
-        return new;
-}
-
-/**
- * del_set
- * ```````
- * Destroy a set created with new_set().
+ * Create a new set.
  *
- * @set   : pointer to a SET.
- * Returns: Nothing.
+ * @nbits: Number of bits (integral values) the set can contain.
+ * Return: An initialized set structure.
  */
-void del_set(struct set_t *set)
-{
-        if (set->map != set->defmap)
-                free(set->map);
-
-        free(set);
-}
-
-
-/**
- * dup_set
- * ```````
- * Create a new set that has the same members as the input set.
- * 
- * @set   : Input set (to be duplicated).
- * Returns: Pointer to a new set with members identical to @set.
- */
-struct set_t *dup_set(struct set_t *set)
+struct set_t *new_set(int nbits)
 {
         struct set_t *new;
 
-        if (!(new = calloc(1, sizeof(struct set_t)))) {
-                halt(SIGABRT, "No memory to create SET.\n");
-                return NULL; // "Shouldn't happen."
-        }
+        new = malloc(sizeof(struct set_t));
 
-        new->compl  = set->compl;
-        new->nwords = set->nwords;
-        new->nbits  = set->nbits;
-
-        if (set->map == set->defmap) {
-                new->map = new->defmap;
-                memcpy(new->defmap, set->defmap, _DEFWORDS * sizeof(_SETTYPE));
-        } else {
-                new->map = (_SETTYPE *)malloc(set->nwords * sizeof(_SETTYPE));
-                if (!new->map)
-                        halt(SIGABRT, "No memory to duplicate SET.\n");
-                
-                memcpy(new->map, set->map, set->nwords * sizeof(_SETTYPE));
-        }
+        new->nwords   = BITFIT(nbits);
+        new->nbits    = nbits;
+        new->map      = calloc(1, BITFIT(nbits));
 
         return new;
 }
 
 
-/**
- * _add_set
- * ````````
- * Called by the ADD() macro when the set isn't big enough.
- *
- * @set: Pointer to a set.
- * @bit: Bit to be added to set.
- */
-int _add_set(struct set_t *set, int bit) 
-{
-        grow_set(set, _ROUND(bit));
-        return _GETBIT(set, bit, |=);
-}
+/******************************************************************************
+ * SET-ELEMENTS                                                               *
+ ******************************************************************************/
 
 
 /**
- * grow_set
- * ````````
- * @set : Pointer to set to be enlarged. 
- * @need: Number of words needed (target).
- *
- * NOTE
- * This routine calls malloc() and is rather slow. Its use should be
- * limited, and avoided if possible.
- */
-void grow_set(struct set_t *set, int need)
-{
-        _SETTYPE *new;
-
-        if (!set || need <= set->nwords)
-                return;
-
-        if (!(new = (_SETTYPE *) malloc(need * sizeof(_SETTYPE))))
-                halt(SIGABRT, "No memory to expand SET.\n");
-
-        memcpy(new, set->map, set->nwords * sizeof(_SETTYPE));
-        memset(new + set->nwords, 0, (need - set->nwords) * sizeof(_SETTYPE));
-
-        if (set->map != set->defmap)
-                free(set->map);
-
-        set->map    = new;
-        set->nwords = (unsigned char)need;
-        set->nbits  = need * _BITS_IN_WORD;
-}
-
-
-/**
- * num_set
+ * set_add
  * ```````
- * Get the number of elements (non-zero bits) in a set. NULL sets are empty.
+ * Add a new value to an existing set.
  *
- * @set  : Pointer to the set.
- * Return: number of set bits in @set. 
+ * @set  : Pointer to a set_t.
+ * @val  : New value to be added.
+ * Return: Nothing.
  */
-int num_set(struct set_t *set)
+void set_add(struct set_t *set, int val)
 {
-        /* 
-         * Neat macro that will expand to a lookup table indexed by a
-         * number in the range 0-255, with tab[i] == the number of set
-         * bits in i.
-         *
-         * Hallvard Furuseth suggested this approach on Sean Anderson's
-         * Bit Twiddling Hacks website on July 14, 2009.  
-         */
-        static const unsigned char nbits[256] = 
-        {
-                #define B2(n) n,     n+1,     n+1,     n+2
-                #define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
-                #define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
-                B6(0), B6(1), B6(1), B6(2)
-        };
+        if (val > set->nbits)
+                bye("set_add: buffer overrun.\n");
 
-        unsigned int count = 0;
-        unsigned char *p;
+        BITSET(set->map, val);
+}
+
+
+/**
+ * set_pop
+ * ```````
+ * Remove a value from a set.
+ *
+ * @set  : Pointer to a set_t.
+ * @val  : New value to be added.
+ * Return: Nothing.
+ */
+void set_pop(struct set_t *set, int val)
+{
+        BITCLR(set->map, val);
+}
+
+
+/**
+ * set_count
+ * `````````
+ * Count the number of items in a set.
+ *
+ * @set  : Pointer to a set.
+ * Return: Number of 1 bits in the set.
+ */
+int set_count(struct set_t *set)
+{
+        int count;
         int i;
 
-        if (!set)
-                return 0;
-
-        p = (unsigned char *)set->map;
-
-        for (i=_BYTES_IN_ARRAY(set->nwords); --i >= 0;)
-                count += nbits[*p++];
+        for (i=0, count=0; i<set->nwords; i++) {
+                count += ones32(set->map[i]);
+        }
 
         return count;
 }
 
 
 /**
- * _set_test
- * `````````
- * Compares two sets. Returns as follows:
+ * set_is_empty 
+ * ````````````
+ * Check if the set is empty.
  *
- *      _SET_EQUIV      Sets are equivalent.
- *      _SET_INTER      Sets intersect but aren't equivalent.
- *      _SET_DISJ       Sets are disjoint.
- *
- * NOTE
- * The smaller set is made larger if the two sets are different sizes.
+ * @set  : Pointer to a set.
+ * Return: true if empty, else false.
  */
-int _set_test(struct set_t *set1, struct set_t *set2)
+bool set_is_empty(struct set_t *set)
 {
-        _SETTYPE *p1;
-        _SETTYPE *p2;
-        int rval;
-        int i;
-        int j;
-
-        rval = _SET_EQUIV;
-        i = max(set1->nwords, set2->nwords);
-
-        grow_set(set1, i);
-        grow_set(set2, i);
-
-        p1 = set1->map;
-        p2 = set2->map;
-
-        for (; --i >= 0; p1++, p2++) {
-                if (*p1 != *p2)
-                        return *p1 - *p2;
-        }
-
-        /* 
-         * You get here if the sets are not equivalent.
-         * If the sets intersect, you can return immediately,
-         * but have to keep going in the case of disjoint
-         * sets because they might actually intersect
-         * at some yet-unseen byte.
-         */
-        if ((j = set1->nwords - i) > 0) {        // set1 is larger
-                while (--j >= 0) {
-                        if (*p1++)
-                                return 1;
-                }
-        } else if ((j = set2->nwords - i) > 0) { // set2 is larger
-                while (--j >= 0) {
-                        if (*p2++)
-                                return -1;
-                }
-        }
-        return 0;                              // they are equivalent.
-}
-
-
-/**
- * set_cmp
- * ```````
- * Yet another comparison function. Works like strcmp().
- *
- * @set1  : Pointer to a set to be compared.
- * @set2  : Pointer to another set.
- * Returns: 0 if set1==set2, < 0 if set1<set2, > 0 if set1>set2.
- */
-int set_cmp(struct set_t *set1, struct set_t *set2)
-{
-        _SETTYPE *p1;
-        _SETTYPE *p2;
-        int j;
+        int count;
         int i;
 
-        i = j = min(set1->nwords, set2->nwords);
+        for (i=0, count=0; i<set->nwords; i++) {
+                if ((count += ones32(set->map[i])));
+                        return false;
+        }
 
-        for (p1 = set1->map, p2 = set2->map; --j >= 0; p1++, p2++) {
-                if (*p1 != *p2)
-                        return *p1 - *p2;
-        }
-        
-        /*
-         * You get here only if all words in both sets are the same.
-         * Check the tail end of the larger array for all zeroes.
-         */
-        if ((j = set1->nwords - i) > 0) {       // set1 is larger
-                while (--j >= 0) {
-                        if (*p1++)
-                                return 1;
-                }
-        } else if ((j = set2->nwords - i) > 0) { // set2 is larger
-                while (--j >= 0) {
-                        if (*p2++)
-                                return -1;
-                }
-        }
-        return 0;                              // they are equivalent.
+        return true;
 }
 
 
-/**
- * sethash
- * ```````
- * Hash a set by summing together the words in the bitmap.
- *
- * @set  : Pointer to a set.
- * Return: hashed value.
- */
-unsigned sethash(struct set_t *set)
-{
-        _SETTYPE *p;
-        unsigned total;
-        int j;
 
-        total = 0;
-        j = set->nwords;
-        p = set->map;
+/******************************************************************************
+ * SET OPERATIONS                                                             *
+ ******************************************************************************/
 
-        while (--j >= 0)
-                total += *p++;
 
-        return total;
-}
 
 /**
- * is_subset
+ * set_union
  * `````````
- * Attempt to determine if 'sub' is a subset of 'set'.
+ * Store the union of sets @dst and @src in @dst.
  *
- * @set  : Pointer to a set.
- * @sub  : Pointer to a possible subset of @set.
- * Return: 1 if @sub is a subset of @set, otherwise 0.
- *
- * NOTE
- * If @sub is larger than @set, the extra bytes must be all zeroes.
+ * @dst  : Destination set 
+ * @src  : Source set
+ * Return: Nothing; @dst is modified.
  */
-int is_subset(struct set_t *set, struct set_t *sub)
+void set_union(struct set_t *dst, struct set_t *src)
 {
-        _SETTYPE *subsetp;
-        _SETTYPE *setp;
-        int common;     // Number of bytes in potential subset.
-        int tail;       // Number of implied 0 bytes in subset.
+        char *d;
+        char *s;
+        int size;
 
-        if (sub->nwords > set->nwords) {
-                common = set->nwords;
-                tail   = sub->nwords - common;
-        } else {
-                common = sub->nwords;
-                tail   = 0;
-        }
+        if (dst->nwords < src->nwords)
+                bye("set_union: destination too small\n");
 
-        subsetp = sub->map;
-        setp    = set->map;
+        size = src->nwords;
+        d    = dst->map;
+        s    = src->map;
 
-        for (; --common >= 0; subsetp++, setp++) {
-                if ((*subsetp & *setp) != *subsetp)
-                        return 0;
-        }
-
-        while (--tail >= 0) {
-                if (*subsetp++)
-                        return 0;
-        }
-
-        return 1;
+        while (size-->0) 
+                *d++ |= *s++;
 }
 
 
 /**
- * _set_op
- * ```````
- * Performs binary operations depending on op.
+ * set_intersection
+ * ````````````````
+ * Store the intersection of sets @dst and @src in @dst.
  *
- * @op: One of _UNION, _INTERSECT, _DIFFERENCE, or _ASSIGN.
- * @dest  : Destination set.
- * @src   : Source set.
- * Returns: nothing.
+ * @dst  : Destination set 
+ * @src  : Source set
+ * Return: Nothing; @dst is modified.
  */
-void _set_op(int op, struct set_t *dest, struct set_t *src)
+void set_intersection(struct set_t *dst, struct set_t *src)
 {
-        _SETTYPE *d; // Destination map.
-        _SETTYPE *s; // Source map.
-        unsigned ssize; // Number of words in source set.
-        int tail; // Dest is this many words bigger than source. 
+        char *d;
+        char *s;
+        int size;
+        int tail;
 
-        ssize = src->nwords;
+        if (dst->nwords < src->nwords)
+                bye("set_intersection: destination too small.\n");
 
-        /* Make sure destination is big enough. */
-        if ((unsigned)dest->nwords < ssize)
-                grow_set(dest, ssize);
+        size = src->nwords;
+        tail = dst->nwords - size;
+        d    = dst->map;
+        s    = src->map;
 
-        tail = dest->nwords - ssize;
-        d = dest->map;
-        s = src->map;
+        while (size-->0) 
+                *d++ &= *s++;
 
-        switch (op) {
-        case _UNION:
-                while (--ssize >= 0)
-                        *d++ |= *s++;
-                break;
-        case _INTERSECT:
-                while (--ssize >= 0)
-                        *d++ &= *s++;
-                while (--tail >= 0)
-                        *d++ = 0;
-                break;
-        case _DIFFERENCE:
-                while (--ssize >= 0)
-                        *d++ ^= *s++;
-                break;
-        case _ASSIGN:
-                while (--ssize >= 0)
-                        *d++ = *s++;
-                while (--tail >= 0)
-                        *d++ = 0;
-                break;
-        }
-}
-
-/**
- * invert_set
- * ``````````
- * Physically invert the bits in the set. Compare with COMPLIMENT().
- *
- * @set  : Pointer to a set.
- * Return: Nothing.
- */
-void invert_set(struct set_t *set)
-{
-        _SETTYPE *p;
-        _SETTYPE *end;
-        
-        for (p = set->map, end = p + set->nwords; p < end; p++)
-                *p = ~*p;
+        while (tail-->0) 
+                *d++ = 0;
 }
 
 
 /**
- * trunc_set
- * `````````
- * Clear a set and truncate it to the default size. Compare with CLEAR().
+ * set_difference
+ * ``````````````
+ * Store the set-theoretical difference of sets @dst and @src in @dst.
  *
- * @set  : Pointer to a set.
- * Return: Nothing.
+ * @dst  : Destination set 
+ * @src  : Source set
+ * Return: Nothing; @dst is modified.
  */
-void trunc_set(struct set_t *set)
+void set_difference(struct set_t *dst, struct set_t *src)
 {
-        if (set->map != set->defmap) {
-                free(set->map);
-                set->map = set->defmap;
-        }
-        set->nwords = _DEFWORDS;
-        set->nbits  = _DEFBITS;
-        memset(set->defmap, 0, sizeof(set->defmap));
+        char *d;
+        char *s;
+        int size;
+
+        if (dst->nwords < src->nwords)
+                bye("set_difference: destination too small.\n");
+
+        size = src->nwords;
+        d    = dst->map;
+        s    = src->map;
+
+        while (size-->0) 
+                *d++ ^= *s++;
 }
+
+
+/**
+ * set_assignment
+ * ``````````````
+ * Assign the set src to the set dst.
+ *
+ * @dst  : Destination set 
+ * @src  : Source set
+ * Return: Nothing; @dst is modified.
+ */
+void set_assignment(struct set_t *dst, struct set_t *src)
+{
+        char *d;
+        char *s;
+        int size;
+        int tail;
+
+        if (dst->nwords < src->nwords)
+                bye("set_assignment: destination too small.\n");
+
+        size = src->nwords;
+        tail = dst->nwords - size;
+        d    = dst->map;
+        s    = src->map;
+
+        while (size-->0) 
+                *d++ = *s++;
+
+        while (tail-->0) 
+                *d++ = 0;
+}
+
+
+/**
+ * set_complement
+ * ``````````````
+ * Reverse the bits of a set.
+ *
+ * @dst  : Destination set 
+ *
+ * Return: Nothing; @dst is modified.
+ */
+void set_complement(struct set_t *dst)
+{
+        char *d;
+        int size;
+
+        size = dst->nwords;
+        d    = dst->map;
+
+        while (size-->0) {
+                *d = ~*d;
+                 d++;
+        }
+}
+
 
 
 /**
@@ -444,19 +276,24 @@ void trunc_set(struct set_t *set)
  */
 int next_member(struct set_t *set)
 {
-        static struct set_t *oset = 0;
+        static struct set_t *oset = NULL;
         static int current = 0;
-        _SETTYPE *map;
+        char *map;
 
-        if (!set)
-                return ((int)(oset = NULL));
+        if (set == NULL) {
+                oset = NULL;
+                return 1; 
+        }
 
         if (oset != set) {
-                oset = set;
+                oset    = set;
                 current = 0;
+                map     = set->map;
 
-                for (map = set->map; *map == 0 && current < set->nbits; ++map)
-                        current += _BITS_IN_WORD;
+                while (*map == 0 && current < set->nbits) {
+                        current += SEGSIZE;
+                        map++;
+                }
         }
 
         /* 
@@ -465,8 +302,8 @@ int next_member(struct set_t *set)
          * never be executed.
          */
         while (current++ < set->nbits) {
-                if (TEST(set, current-1))
-                        return (current - 1);
+                if (set_contains(set, current-1))
+                        return (current-1);
         }
         return (-1);
 }
@@ -498,6 +335,122 @@ void print_set(struct set_t *set)
                 if (!did_something)
                         printf("Empty set.\n");
         }
+}
+
+
+/******************************************************************************
+ * SET TESTS                                                                  *
+ ******************************************************************************/
+
+
+#define SET_EQUIVALENT 0
+#define SET_DISJOINT   1
+#define SET_INTERSECT  2
+
+/**
+ * set_test
+ * ````````
+ * Compares two sets. Returns as follows:
+ *
+ *      SET_EQUIVALENT     Sets are equivalent.
+ *      SET_DISJOINT       Sets are disjoint.
+ *      SET_INTERSECT      Sets intersect but aren't equivalent.
+ *
+ *
+ * NOTE
+ * The smaller set is made larger if the two sets are different sizes.
+ */
+int set_test(struct set_t *a, struct set_t *b)
+{
+        char *p1;
+        char *p2;
+        int rval;
+        int i;
+
+        rval = SET_EQUIVALENT;
+        i    = max(a->nwords, b->nwords);
+        p1   = a->map;
+        p2   = b->map;
+
+        for (; i-->0; p1++, p2++) {
+                if (*p1 != *p2) {
+                        /* 
+                         * You get here if the sets are not equivalent.
+                         * If the sets intersect, you can return immediately,
+                         * but have to keep going in the case of disjoint
+                         * sets because they might actually intersect
+                         * at some yet-unseen byte.
+                         */
+                        if (*p1 & *p2)
+                                return SET_INTERSECT;
+                        else    
+                                rval = SET_DISJOINT;
+                }
+        }
+        return rval;
+}
+
+
+/**
+ * sets_equivalent
+ * ```````````````
+ * Tests if two sets are equivalent.
+ *
+ * @a    : Pointer to set.
+ * @b    : Pointer to set.
+ * Return: true if @a equivalent to @b, else false.
+ */
+bool sets_equivalent(struct set_t *a, struct set_t *b)
+{
+        return (set_test(a, b) == SET_EQUIVALENT) ? true : false;
+}
+
+
+/**
+ * sets_intersect
+ * ``````````````
+ * Tests if two sets are intersecting but not equivalent.
+ *
+ * @a    : Pointer to set.
+ * @b    : Pointer to set.
+ * Return: true if @a intersects with @b, else false.
+ */
+bool sets_intersect(struct set_t *a, struct set_t *b)
+{
+        return (set_test(a, b) == SET_INTERSECT) ? true : false;
+}
+
+
+/**
+ * sets_disjoint
+ * `````````````
+ * Tests if two sets are disjoint.
+ *
+ * @a    : Pointer to set.
+ * @b    : Pointer to set.
+ * Return: true if @a is disjoint with @b, else false.
+ */
+bool sets_disjoint(struct set_t *a, struct set_t *b)
+{
+        return (set_test(a, b) == SET_DISJOINT) ? true : false;
+}
+
+
+/**
+ * set_contains
+ * ````````````
+ * Tests if a set contains a value.
+ *
+ * @set  : Pointer to set.
+ * @val  : Value to be checked.
+ * Return: true if bit at position @val is 1, else false.
+ */
+bool set_contains(struct set_t *set, int val)
+{
+        if (val >= set->nbits)
+                bye("set_contains: buffer overrun.\n");
+
+        return (bool)(BITVAL(set->map, val)); 
 }
 
 

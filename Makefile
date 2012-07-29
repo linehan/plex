@@ -9,7 +9,7 @@ LDFLAGS=
 #    
 #                                  
 
-SOURCES=main.c lib/file.c lib/set.c lib/textutils.c lib/debug.c scan.c lex.c macro.c nfa.c dfa.c gen.c
+SOURCES=main.c lib/redblack.c lib/file.c lib/set.c lib/textutils.c lib/debug.c scan.c lex.c macro.c nfa.c dfa.c gen.c
 OBJECTS=$(SOURCES:.c=.o)
 
 EXECUTABLE=plex
