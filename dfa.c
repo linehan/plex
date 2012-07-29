@@ -48,7 +48,7 @@ void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa);
 
 struct dfa_t *new_dfa(int max_states);
 
-struct dfa_state *new_dfa_state(struct dfa_t *dfa, struct set_t *set);
+struct dfa_state *new_dfa_state(struct dfa_t *dfa);
 int              add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *state);
 int                  in_dstates(struct dfa_t *dfa, struct set_t *nfa_set);
 struct dfa_state * get_unmarked(struct dfa_t *dfa);
@@ -101,15 +101,15 @@ struct dfa_t *new_dfa(int max)
  * @dfa  : DFA object on which to allocate a state.
  * Return: Pointer to the state.
  */
-struct dfa_state *new_dfa_state(struct dfa_t *dfa, struct set_t *set)
+struct dfa_state *new_dfa_state(struct dfa_t *dfa)
 {
         struct dfa_state *new;
 
         /* Allocate the new state */
         if (!(new = malloc(sizeof(struct dfa_state))))
-                halt(SIGABRT, "new_nfa: Out of memory.\n");
+                halt(SIGABRT, "new_dfa: Out of memory.\n");
 
-        new->bitset = (set) ? set : new_set(1024);
+        new->bitset = NULL; 
         new->id     = dfa->n;
         new->mark   = false;
         new->accept = NULL;
@@ -122,9 +122,12 @@ struct dfa_state *new_dfa_state(struct dfa_t *dfa, struct set_t *set)
         if (new->id == 0)
                 dfa->start = new;
 
+        if (new->id > dfa->max)
+                halt(SIGABRT, "new_dfa_state: State overflow\n");
+
         /*
          * Add the new state to the state
-         * array of the NFA object.
+         * array of the DFA object.
          */
         dfa->state[new->id] = new;
         dfa->n++;
@@ -153,10 +156,14 @@ int add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *s
 
         ENTER("add_to_dstates");
 
-        d = new_dfa_state(dfa, nfa_set);
+        d = new_dfa_state(dfa);
 
-        d->accept = state->accept;
-        d->anchor = state->anchor;
+        d->bitset = nfa_set;
+
+        if (state != NULL) {
+                d->accept = state->accept;
+                d->anchor = state->anchor;
+        }
 
         LEAVE("add_to_dstates");
 
@@ -282,18 +289,18 @@ void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa)
 
         ENTER("make_dtran");
 
-        /* 
-         * Initially Dstates contains a single, unmarked, start state 
-         * formed by taking the epsilon closure of the NFA start state. 
-         * So, Dstates[0] (and DTAB[0]) is the DFA start state.
-         */
         nfa_set = new_set(1024) ;
 
         /* Make the dfa start state. */
         set_add(nfa_set, nfa->start->id);
         accept = e_closure(nfa, nfa_set);
 
+        ___BREAKPOINT___;
+
+        /* --------- program is breaking right here ----------- */
         add_to_dstates(dfa, nfa_set, accept);
+
+
 
         /* Make the table */
         while ((current = get_unmarked(dfa))) {
