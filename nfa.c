@@ -171,7 +171,7 @@ struct nfa_t *thompson(FILE *input)
  *
  * @nfa   : NFA object. 
  * @T     : The set of start states over which to perform the closure. 
- * Return : The epsilon closure over T (a set of NFA states).
+ * Return : A copy of the accepting state of the closure.
  *
  * CAVEAT 
  * Unlike move(), which considers transitions on a symbol, e_closure()
@@ -183,6 +183,14 @@ struct nfa_t *thompson(FILE *input)
  * and a stack is required to manage the task effectively.
  *
  * NOTES
+ * If there is no accepting state in the closure set, NULL is returned.
+ * If the closure set contains more than one accepting state, the one
+ * with the lowest NFA state id is returned. This way, conflicting states
+ * that are higher in the input file will take precedence.
+ *
+ * accept_num holds the id of this last accepting state. If the current
+ * state has a lower number, the other state is overwritten.
+ *
  * The algorithm used can be summarized as follows:
  *
  *    begin
@@ -198,19 +206,18 @@ struct nfa_t *thompson(FILE *input)
  *            end
  *    end
  */
-struct set_t *e_closure(struct nfa_t *nfa, struct set_t *input, char **accept, int *anchor)
+struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
 {
         new_stack(stack, int, NFA_MAX);
+        static int accept_num = 0xdeadbeef;
+        struct nfa_state *accept = NULL;
         struct nfa_state *p;  
-        int accept_num = LARGEST_INT;
         int i;               
 
         ENTER("e_closure");
 
         if (!input)
 	        goto abort;
-
-        *accept = NULL; 
 
         /* 
          * Load the members of the input set into the stack. 
@@ -231,8 +238,7 @@ struct set_t *e_closure(struct nfa_t *nfa, struct set_t *input, char **accept, i
 
 	        if (p->accept && (i < accept_num)) {
                         accept_num = i;
-                        *accept    = p->accept;
-                        *anchor    = p->anchor;
+                        accept     = p;
 	        }
 
                 /* If p has an edge labeled EPSILON */
@@ -273,7 +279,7 @@ struct set_t *e_closure(struct nfa_t *nfa, struct set_t *input, char **accept, i
         }
         abort:
                 LEAVE("e_closure");
-                return input;
+                return accept;
 }
 
 

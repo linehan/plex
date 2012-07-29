@@ -21,7 +21,7 @@
  * @nrows: Number of states in dtran[]
  * @accept: set of accept states in dtran[]
  */
-void pheader(FILE *fp, struct dfa_table_row **dtran, int nrows, struct accept_t *accept)
+void pheader(FILE *fp, int **dtran, int nrows, struct accept_t *accept)
 {
         int last_transition;
         int chars_printed = 0;
@@ -52,9 +52,9 @@ void pheader(FILE *fp, struct dfa_table_row **dtran, int nrows, struct accept_t 
 	        last_transition = -1;
 
 	        for (j=0; j<MAX_CHARS; j++) {
-	                if (dtran[i]->row[j] != F) {
-		                if (dtran[i]->row[j] != last_transition) {
-		                        fprintf(fp, "\n *    goto %2d on ", dtran[i]->row[j]);
+	                if (dtran[i][j] != F) {
+		                if (dtran[i][j] != last_transition) {
+		                        fprintf(fp, "\n *    goto %2d on ", dtran[i][j]);
 		                        chars_printed = 0;
 		                }
 		                fprintf(fp, "%s", bin_to_ascii(j,1) );
@@ -64,7 +64,7 @@ void pheader(FILE *fp, struct dfa_table_row **dtran, int nrows, struct accept_t 
 		                        chars_printed = 0;
 		                }
 
-		                last_transition = dtran[i]->row[j];
+		                last_transition = dtran[i][j];
 	                }
 	        }
 	        fprintf(fp, "\n");

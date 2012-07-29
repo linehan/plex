@@ -61,8 +61,8 @@ void                    del_nfa(struct nfa_state *doomed);
 struct nfa_t *thompson(FILE *input);
 char *            save(char *str);
 
-struct set_t *e_closure(struct nfa_t *nfa, struct set_t *input, char **accept, int *anchor);
-struct set_t *move(struct nfa_t *nfa, struct set_t *input, int c);
+struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input);
+struct set_t          *move(struct nfa_t *nfa, struct set_t *input, int c);
 
 void print_nfa(struct nfa_t *nfa);
 

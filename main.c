@@ -22,21 +22,21 @@
  */
 void flex(struct pgen_t *pgen)
 {
-        struct dfa_table_row *dtrans;
-        struct accept_t      *accept;
+        int **dtrans;
+        struct accept_t *accept;
         int nstates;
 
         /* Print the input file header */
         scan_head(pgen);
 
-        /*[> Construct the DFA <]*/
-        /*nstates = dfa(pgen, &dtrans, &accept);*/
+        /* Construct the DFA */
+        nstates = dfa(pgen, &dtrans, &accept);
 
-        struct nfa_t *nfa = thompson(pgen->in);
+        /*struct nfa_t *nfa = thompson(pgen->in);*/
 
-        print_nfa(nfa);
+        /*print_nfa(nfa);*/
 
-        ___BREAKPOINT___;
+        /*___BREAKPOINT___;*/
 
         /* Print the DFA transition table to the output stream. */
         fprintf(pgen->out,
