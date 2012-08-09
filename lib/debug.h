@@ -48,13 +48,13 @@
 
 #if defined(NO_DEBUG)
 #define DEBUG(...) /* nothing */
-#define ENTER(f)   /* nothing */
-#define LEAVE(f)   /* nothing */
+#define __ENTER   /* nothing */
+#define __LEAVE   /* nothing */
 #define ___BREAKPOINT___ /* nothing */
 #else
 #define DEBUG(...) _DEBUG(NUM_ARGS(__VA_ARGS__), __VA_ARGS__)
-#define ENTER(f)   DEBUG("Entering %s", (f))
-#define LEAVE(f)   DEBUG("Leaving %s", (f))
+#define __ENTER   DEBUG("Entering %s", __func__)
+#define __LEAVE   DEBUG("Leaving %s", __func__)
 #define ___BREAKPOINT___ DEBUG("Breakpoint") 
 #endif
 

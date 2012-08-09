@@ -11,10 +11,9 @@
 #include "nfa.h"
 
 
-void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa);
+void subset(struct dfa_t *dfa, struct nfa_t *nfa);
 
-struct dfa_t *new_dfa(int max_states);
-
+struct dfa_t *          new_dfa(int max_states);
 struct dfa_state *new_dfa_state(struct dfa_t *dfa);
 int              add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *state);
 int                  in_dstates(struct dfa_t *dfa, struct set_t *nfa_set);
@@ -26,6 +25,8 @@ struct dfa_state * get_unmarked(struct dfa_t *dfa);
  * ```````
  * Allocate and initialize a new DFA object.
  *
+ * @max  : Maximum number of states to allocate for the DFA.
+ * Return: DFA object.
  */
 struct dfa_t *new_dfa(int max)
 {
@@ -40,13 +41,7 @@ struct dfa_t *new_dfa(int max)
         if (!(new->state = malloc(max * sizeof(struct dfa_state *))))
                 halt(SIGABRT, "new_dfa: Out of memory.\n");
 
-        /* 
-         * Allocate the transition table.
-         *
-         * The transition table is indexed by state number along
-         * the major axis and by character code along the minor
-         * axis.
-         */
+        /* Allocate the transition table. [state #][character] */
         if (!(new->trans = malloc(max * sizeof(int *))))
                 halt(SIGABRT, "new_dfa: Out of memory.\n");
 
@@ -65,6 +60,8 @@ struct dfa_t *new_dfa(int max)
 /**
  * new_dfa_state
  * `````````````
+ * Allocate a new state in the state array of the DFA object.
+ *
  * @dfa  : DFA object on which to allocate a state.
  * Return: Pointer to the state.
  */
@@ -77,33 +74,22 @@ struct dfa_state *new_dfa_state(struct dfa_t *dfa)
                 halt(SIGABRT, "new_dfa: Out of memory.\n");
 
         new->id     = dfa->n;
-        new->bitset = NULL; 
         new->mark   = false;
+        new->bitset = NULL; 
         new->accept = NULL;
         new->anchor = 0;
 
-        /* 
-         * Set the start state of the NFA
-         * object if appropriate.
-         */
+        /* Set the start state of the DFA object, if appropriate. */
         if (new->id == 0)
                 dfa->start = new;
 
         if (new->id > dfa->max)
                 halt(SIGABRT, "new_dfa_state: State overflow\n");
 
-        /*
-         * Add the new state to the state
-         * array of the DFA object.
-         */
+        /* Add the new state to the state array of the DFA object. */
         dfa->state[new->id] = new;
         dfa->n++;
 
-        /*
-         * Return a pointer to the new
-         * state so it can be manipulated
-         * immediately.
-         */
         return new;
 }
 
@@ -121,10 +107,9 @@ int add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *s
 {
         struct dfa_state *d;
 
-        ENTER("add_to_dstates");
+        __ENTER;
 
         d = new_dfa_state(dfa);
-
         d->bitset = nfa_set;
 
         if (state != NULL) {
@@ -132,7 +117,7 @@ int add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *s
                 d->anchor = state->anchor;
         }
 
-        LEAVE("add_to_dstates");
+        __LEAVE;
 
 	return dfa->n;
 }
@@ -142,15 +127,18 @@ int add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *s
 /** 
  * in_dstates
  * ``````````
- * If there's a set in Dstates that is identical to nfa_set, return the
- * index of the Dstate entry, else return -1.
+ * Test whether a set of NFA states exists in the DFA object.
+ *
+ * @dfa    : DFA object.
+ * @nfa_set: Set of NFA state id numbers.
+ * Return  : Index of DFA state containing @nfa_set, else -1.
  */
 int in_dstates(struct dfa_t *dfa, struct set_t *nfa_set)
 {
         struct dfa_state *d;
         int i;
 
-        ENTER("in_dstates");
+        __ENTER;
 
         for (i=0; i<dfa->n; i++) {
                 d = dfa->state[i];
@@ -159,7 +147,7 @@ int in_dstates(struct dfa_t *dfa, struct set_t *nfa_set)
                         return d->id;
         }
 
-        LEAVE("in_dstates");
+        __LEAVE;
 
         return -1;
 }
@@ -168,9 +156,10 @@ int in_dstates(struct dfa_t *dfa, struct set_t *nfa_set)
 /* 
  * get_unmarked
  * ````````````
- * Return a pointer to an unmarked state in Dstates. If no such state
- * exists, return NULL. Print an asterisk for each state to tell the
- * user that the program hasn't died while the table is being constructed.
+ * Get a pointer to an unmarked state in the DFA state array.
+ *
+ * @dfa  : DFA object.
+ * Return: Pointer to a DFA state, or NULL if none found.
  */
 struct dfa_state *get_unmarked(struct dfa_t *dfa)
 {
@@ -180,8 +169,6 @@ struct dfa_state *get_unmarked(struct dfa_t *dfa)
         for (i=0; i<dfa->n; i++) {
                 d = dfa->state[i];
                 if (d->mark == false) {
-	                putc('*', stderr);
-	                fflush(stderr);
 	                return d;
 	        }
         }
@@ -189,49 +176,62 @@ struct dfa_state *get_unmarked(struct dfa_t *dfa)
 }
 
 
+/**
+ * accept_states
+ * `````````````
+ * Build the array of accepting states.
+ *
+ * @dfa: The DFA object.
+ */
+struct accept_t *accept_states(struct dfa_t *dfa)
+{
+        struct accept_t *acc;
+        int i;
+
+        __ENTER;
+
+        acc = malloc(dfa->n * sizeof(struct accept_t));
+
+        for (i=0; i<dfa->n; i++) {
+                if (dfa->state[i]->accept) {
+	                acc[i].string = strdup(dfa->state[i]->accept);
+	                acc[i].anchor = dfa->state[i]->anchor;
+                }
+        }
+
+        __LEAVE;
+
+        return acc;
+}
+
 
 
 /**
- * dfa
- * ```
- * Turn an NFA with indicated start state (sstate) into a DFA and
- * return the number of states in the DFA transition table.
- * 
- * dfap is modified to point at that transition table
- * acceptp is modified to point at an array of accepting states
- * (indexed by state number).
- * dfa() discards all the memory used for the initial NFA.
+ * do_build 
+ * ````````
+ * Parse the input, generate an NFA (Thompson's), then do subset construction.
+ *
+ * @pgen  : Parser-generator object.
+ * @accept: Pointer to an array of accept structs (will be modified).
+ * Return : DFA object.
  */
-struct dfa_t *subset(struct pgen_t *pgen, struct accept_t **accept)
+struct dfa_t *do_build(struct pgen_t *pgen, struct accept_t **accept)
 {
-        struct accept_t *accept_states;
         struct nfa_t *nfa;
         struct dfa_t *dfa;
-        int i;
 
-        ENTER("dfa");
+        __ENTER;
 
-        /* Build the NFA */
         nfa = thompson(pgen->in);
-
         dfa = new_dfa(DFA_MAX);
 
-        make_dtran(dfa, nfa);
+        subset(dfa, nfa);
 
-        /* Build the DFA */
-        accept_states = malloc(dfa->n * sizeof(struct accept_t));
+        /* --------------------- the rest is weird -------------------- */
 
-        if (!accept_states || !dfa->trans)
-	        halt(SIGABRT, "Out of memory!!");
+        *accept = accept_states(dfa);
 
-        for (i=0; i<dfa->n; i++) {
-	        accept_states[i].string = dfa->state[i]->accept;
-	        accept_states[i].anchor = dfa->state[i]->anchor;
-        }
-
-        *accept = accept_states;
-
-        LEAVE("dfa");
+        __LEAVE;
 
         print_nfa(nfa);
         printf("\n\n");
@@ -240,13 +240,16 @@ struct dfa_t *subset(struct pgen_t *pgen, struct accept_t **accept)
 }
 
 
-
 /**
- * make_dtran
- * ``````````
- * @sstate: starting NFA state
+ * subset
+ * ``````
+ * Transform a NFA into a DFA which accepts the same language.
+ *
+ * @dfa  : DFA object.
+ * @nfa  : NFA object.
+ * Return: Nothing.
  */
-void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa)
+void subset(struct dfa_t *dfa, struct nfa_t *nfa)
 {
         struct dfa_state *current; // state currently being expanded
         struct nfa_state *accept;
@@ -254,7 +257,7 @@ void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa)
         int nextstate;             // goto DFA state for current char
         int c;                     // input char
 
-        ENTER("make_dtran");
+        __ENTER;
 
         nfa_set = new_set(MAX_CHARS) ;
 
@@ -270,8 +273,11 @@ void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa)
 
 	        for (c=0; c<MAX_CHARS; c++) {
 
-	                if ((nfa_set = move(nfa, current->bitset, c)))
+	                if ((nfa_set = move(nfa, current->bitset, c))) {
 		                accept = e_closure(nfa, nfa_set);
+                                if (accept && accept->accept)
+                                        printf("LOOK: %s\n", accept->accept);
+                        }
 
 	                if (!nfa_set) 
 		                nextstate = F;
@@ -286,6 +292,6 @@ void make_dtran(struct dfa_t *dfa, struct nfa_t *nfa)
         /* Terminate string of *'s printed in get_unmarked(); */
         putc('\n', stderr);   	
 
-        LEAVE("make_dtran");
+        __LEAVE;
 }
 

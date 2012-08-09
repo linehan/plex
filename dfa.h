@@ -51,7 +51,7 @@ struct dfa_t {
 
 
 
-struct dfa_t *subset(struct pgen_t *pgen, struct accept_t **accept);
+struct dfa_t *do_build(struct pgen_t *pgen, struct accept_t **accept);
 
 
 #endif 

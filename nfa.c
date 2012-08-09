@@ -46,6 +46,8 @@ struct nfa_t *new_nfa(int max)
 /**
  * new_nfa_state
  * `````````````
+ * Allocate memory for a new state in the state array of @nfa.
+ *
  * @nfa  : NFA object on which to allocate a state.
  * Return: Pointer to the state.
  */
@@ -61,25 +63,14 @@ struct nfa_state *new_nfa_state(struct nfa_t *nfa)
         new->edge   = EPSILON;
         new->id     = nfa->n;
 
-        /* 
-         * Set the start state of the NFA
-         * object if appropriate.
-         */
+        /* Set the NFA start pointer if appropriate. */
         if (new->id == 0)
                 nfa->start = new;
 
-        /*
-         * Add the new state to the state
-         * array of the NFA object.
-         */
+        /* Add the state to the state array. */
         nfa->state[new->id] = new;
         nfa->n++;
 
-        /*
-         * Return a pointer to the new
-         * state so it can be manipulated
-         * immediately.
-         */
         return new;
 }
 
@@ -125,14 +116,12 @@ char *save(char *str)
         if (*str == '|')
                 return (char *)(saved + 1);
 
-        /* Free the memory at *saved, if it exists. */
-        if (saved)
-                free(saved);
-
-        /* Place a duplicate of @str at 'saved'. */
-        saved = strdup(str);
-
-        return saved;
+        /* 
+         * Place a duplicate of @str at 'saved'. 
+         * The old memory that 'saved' pointed to still exists, but
+         * is simply not referenced here anymore. 
+         */
+        return strdup(str);
 }
 
 
@@ -141,8 +130,7 @@ char *save(char *str)
  * ````````
  * The main access routine. Creates an NFA using Thompson's construction.
  *
- * @max_state  : the maximum number of states, modified to reflect largest used.
- * @start_state: modified to be the start state
+ * @input: File
  */
 struct nfa_t *thompson(FILE *input)
 {
@@ -190,65 +178,42 @@ struct nfa_t *thompson(FILE *input)
  *
  * accept_num holds the id of this last accepting state. If the current
  * state has a lower number, the other state is overwritten.
- *
- * The algorithm used can be summarized as follows:
- *
- *    begin
- *        push all states in T onto stack 'stack'.
- *        while stack is not empty, do
- *            begin
- *                pop the top element s of stack 
- *                if s is an accepting state, set the accept string
- *                    if there is an epsilon transition from s to u
- *                        if u is not a member of the closure set
- *                            add u to the closure set
- *                            push u onto the stack
- *            end
- *    end
  */
 struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
 {
         new_stack(stack, int, NFA_MAX);
-        int accept_num = 0xdeadbeef;
+        int accept_num = 9999;
         struct nfa_state *accept = NULL;
         struct nfa_state *p;  
         int i;               
 
-        ENTER("e_closure");
+        __ENTER;
 
         if (!input)
 	        goto abort;
 
-        /* 
-         * Load the members of the input set into the stack. 
-         */
-        next_member(NULL);
-
-        while ((i = next_member(input)) != -1)
+        /* Push the input set onto the stack. */
+        for (next_member(NULL); ((i = next_member(input)) != -1);)
                 push(stack, i);
 
-        /* 
-         * Main loop 
-         */
+        /* Main loop */
         while (!stack_empty(stack)) {
 
                 /* Get an NFA state. */
 	        i = pop(stack);
 	        p = nfa->state[i];
 
+                /* If state is accepting, save it. */
 	        if (p->accept && (i < accept_num)) {
+                        printf("LOOK: %s\n", p->accept);
                         accept_num = i;
                         accept     = p;
 	        }
 
-                /* If p has an edge labeled EPSILON */
 	        if (p->edge == EPSILON) {
 
-                        /* If connected to another state. */
 	                if (p->next) {
-
                                 i = p->next->id;
-
                                 /* 
                                  * If the input set does not contain
                                  * the state being examined, add it
@@ -260,11 +225,8 @@ struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
                                 }
 	                }
                         
-                        /* If connected to another state. */
                         if (p->next2) {
-
                                 i = p->next2->id;
-
                                 /* 
                                  * If the input set does not contain
                                  * the state being examined, add it
@@ -277,8 +239,9 @@ struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
                         }
 	        }
         }
+
         abort:
-                LEAVE("e_closure");
+                __LEAVE;
                 return accept;
 }
 
@@ -301,7 +264,7 @@ struct set_t *move(struct nfa_t *nfa, struct set_t *input, int c)
         struct nfa_state *p;         // NFA state pointer. 
         int i;
 
-        ENTER("move");
+        __ENTER;
 
         /* For each state of the NFA */
         for (i=0; i<nfa->n; i++) {
@@ -329,7 +292,7 @@ struct set_t *move(struct nfa_t *nfa, struct set_t *input, int c)
 	        }
         }
 
-        LEAVE("move");
+        __LEAVE;
 
         return output;
 }

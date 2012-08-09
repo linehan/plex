@@ -40,7 +40,7 @@ struct nfa_state *rule(struct lexer_t *lex);
 void              expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
 void          cat_expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
 int       first_in_cat(struct lexer_t *lex);
-void            factor(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
+void           closure(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
 void              term(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp);
 void            dodash(struct lexer_t *lex, struct set_t *set);
 
@@ -97,7 +97,7 @@ void machine(struct lexer_t *lex)
 {
         struct nfa_state *state;
 
-        ENTER("machine");
+        __ENTER;
 
         state       = new_nfa_state(lex->nfa);
         state->next = rule(lex);
@@ -108,7 +108,13 @@ void machine(struct lexer_t *lex)
                 state->next  = rule(lex);
         }
 
-        LEAVE("machine");
+        int i;
+        for (i=0; i<lex->nfa->n; i++) {
+                if (lex->nfa->state[i]->accept)
+                        printf("LOOK: %s\n", lex->nfa->state[i]->accept);
+        }
+
+        __LEAVE;
 }
 
 
@@ -120,9 +126,9 @@ void machine(struct lexer_t *lex)
 /**
  * advance
  * ```````
- * Get the next token by scanning the input file.
+ * Get the next token from the input file stream.
  *
- * @???
+ * @lex  : The lexer object.
  * Return: The next token.
  *
  * TODO
@@ -142,7 +148,7 @@ enum token_t advance(struct lexer_t *lex)
         static bool in_quote = false; // When processing a quoted string.
         bool saw_escape;              // Saw a backslash escape
 
-        ENTER("advance");
+        __ENTER;
 
         new_stack(stack, char *, 32);
 
@@ -246,47 +252,31 @@ enum token_t advance(struct lexer_t *lex)
         printf("lexeme: %c token: %d\n", lex->lexeme, TOKEN_MAP[lex->lexeme]);
 
         exit:
-                LEAVE("advance");
+                __LEAVE;
                 return lex->token;
 }
 
 
 /******************************************************************************
- * Parser
- * ``````
- * The following components implement a recursive descent parser which
- * produces a non-finite automaton for a regular expression using 
- * Thompson's construction. 
- *
- * The NFA is created as a directed graph, which each node containing
- * pointers to the next node. The machine can also be considered as an
- * array where the state number is the array index.
- *
- * The parser descends through 
- *
- *      rule()
- *      expr()
- *      factor()
- *      term()
- *      dodash()
- *
+ * PARSER 
  ******************************************************************************/
+
 
 /**
  * rule
  * ````
- * Return an NFA for a rule in the grammar.
+ * Construct an NFA state for a rule specified in the grammar file.
  *
- *	rule	--> expr  EOS action
- *		    ^expr EOS action
- *		    expr$ EOS action
+ * @lex  : The lexer object.
+ * Return: NFA state which represents the rule.
  *
- *	action	--> <tabs> <string of characters>
- *		    epsilon
+ * NOTES
+ * A rule defines a structure and its name. These structures are used to
+ * build the grammar. Rules are usually stated in the format NAME : BODY.
  */
 struct nfa_state *rule(struct lexer_t *lex)
 {
-        ENTER("rule");
+        __ENTER;
 
         struct nfa_state *start = NULL;
         struct nfa_state *end   = NULL;
@@ -329,7 +319,7 @@ struct nfa_state *rule(struct lexer_t *lex)
         end->anchor = anchor;
         advance(lex); // Skip past EOS
 
-        LEAVE("rule");
+        __LEAVE;
 
         return start;
 }
@@ -338,25 +328,36 @@ struct nfa_state *rule(struct lexer_t *lex)
 /**
  * expr
  * ````
+ * Construct a state machine to represent an expression.
+ *
+ * @lex  : The lexer object.
+ * Return: Nothing.
+ *
  * NOTE
  * Because a recursive descent compiler can't handle left recursion,
- * certain productions such as
+ * certain productions must be translated using an additional step:
  *
- *	expr	-> expr OR cat_expr
- *		|  cat_expr
+ * For example, the following rule will loop forever if evaluated 
+ * recursively.
  *
- * must be translated into
+ *      expr : expr OR cat_expr
+ *           | cat_expr 
  *
- *	expr	-> cat_expr expr'
- *	expr'	-> OR cat_expr expr'
- *		   epsilon
+ * In order for a recursive-descent parser to make sense of it, the
+ * rule must be transformed like so:
  *
- * This translation can be implemented with this loop:
+ *      expr  : cat_expr expr'
+ *      expr' : OR cat_expr expr'
+ *            | epsilon
  *
- *	cat_expr
- *	while( match(OR) )
- *		cat_expr
- *		do the OR
+ * In code, the translation is performed by means of a while loop, so
+ * that it actually looks something like:
+ *
+ *      cat_expr
+ *      while(match(OR))
+ *              cat_expr
+ *              do the OR
+ *
  */
 void expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
@@ -364,7 +365,7 @@ void expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **end
         struct nfa_state *e2_end   = NULL;
         struct nfa_state *p;
 
-        ENTER("expr");
+        __ENTER;
 
         cat_expr(lex, startp, endp);
 
@@ -383,52 +384,49 @@ void expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **end
 	        *endp = p;
         }
 
-        LEAVE("expr");
+        __LEAVE;
 }
 
 
 /** 
  * cat_expr
  * ````````
- * The same translations that were needed in the expr rules are needed again
- * here:
+ * Construct a state machine for a concatenated expression.
  *
- *	cat_expr  -> cat_expr | factor
- *		     factor
- *
- * is translated to:
- *
- *	cat_expr  -> factor cat_expr'
- *	cat_expr' -> | factor cat_expr'
- *		     epsilon
+ * @lex  : The lexer object.
+ * Return: Nothing.
  */
 void cat_expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
         struct nfa_state *e2_start;
         struct nfa_state *e2_end;
 
-        ENTER("cat_expr");
+        __ENTER;
 
         if (first_in_cat(lex))
-	        factor(lex, startp, endp);
+	        closure(lex, startp, endp);
 
         while (first_in_cat(lex)) {
-	        factor(lex, &e2_start, &e2_end);
-
+	        closure(lex, &e2_start, &e2_end);
 	        memcpy(*endp, e2_start, sizeof(struct nfa_state));
-	        del_nfa(e2_start);
-
 	        *endp = e2_end;
         }
 
-        LEAVE("cat_expr");
+        __LEAVE;
 }
 
 
-
+/**
+ * first_in_cat
+ * ````````````
+ * Check if token is the first in a sequence of concatenated tokens.
+ *
+ * @lex  : Lexer object.
+ * Return: true if item can be concatenated to its neighbor, else false.
+ */
 int first_in_cat(struct lexer_t *lex)
 {
-        ENTER("first_in_cat");
+        __ENTER;
 
         switch ((int)lex->token) 
         {
@@ -455,21 +453,26 @@ int first_in_cat(struct lexer_t *lex)
                 break;
         }
 
-        LEAVE("first_in_cat");
+        __LEAVE;
 
         return 1;
 }
 
 
-/**		
- * factor --> term*  | term+  | term?
+/**
+ * closure
+ * ```````
+ * Construct a state machine for one of the closure operators * and ?.
+ *
+ * @lex  : Lexer object.
+ * Return: true if item can be concatenated to its neighbor, else false.
  */
-void factor(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
+void closure(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {
         struct nfa_state *start;
         struct nfa_state *end;
 
-        ENTER("factor");
+        __ENTER;
 
         term(lex, startp, endp);
 
@@ -496,7 +499,7 @@ void factor(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **e
                 advance(lex);
         }
 
-        LEAVE("factor");
+        __LEAVE;
 }
 
 
@@ -514,7 +517,7 @@ void term(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **end
         struct nfa_state *start;
         int c;
 
-        ENTER("term");
+        __ENTER;
 
         if (lex->token == OPEN_PAREN) {
 	        advance(lex);
@@ -563,7 +566,7 @@ void term(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **end
                 }
         }
 
-        LEAVE("term");
+        __LEAVE;
 }
 
 
@@ -572,7 +575,7 @@ void dodash(struct lexer_t *lex, struct set_t *set)
 {
         register int first = 0;
 
-        ENTER("dodash");
+        __ENTER;
 
         /* Treat [-...] as a literal dash, but print a warning. */
         if (lex->token == DASH) {		
@@ -597,9 +600,7 @@ void dodash(struct lexer_t *lex, struct set_t *set)
 	        }
 	}
 
-        LEAVE("dodash");
+        __LEAVE;
 }
-
-
 
 

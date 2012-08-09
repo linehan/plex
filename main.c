@@ -29,7 +29,7 @@ void flex(struct pgen_t *pgen)
         scan_head(pgen);
 
         /* Construct the DFA */
-        dfa = subset(pgen, &accept);
+        dfa = do_build(pgen, &accept);
 
         /* Print the DFA transition table to the output stream. */
         fprintf(pgen->out,
@@ -65,8 +65,6 @@ void do_pgen(FILE *input, FILE *output)
 
         pgen->in  = input;
         pgen->out = output;
-
-        //test(pgen->in);
 
         flex(pgen);
 }
