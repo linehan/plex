@@ -2,11 +2,35 @@
 #define _DFA_H
 
 #include "main.h"
+#include "lex.h"
 
-#define DFA_MAX   254 // Maximum number of DFA states.
-#define MAX_CHARS 128 // Maximum width of DFA transition table.
-#define F          -1 // Marks a failure state in the table.
 
+/******************************************************************************
+ * CONSTANTS
+ ******************************************************************************/
+
+/* 
+ * Maximum number of states in a single
+ * finite state machine. 
+ */
+#define DFA_MAX 254 
+
+/*
+ * Maximum width (number of columns) in a
+ * DFA's transition table.
+ */
+#define MAX_CHARS 128 
+
+/* 
+ * Denotes a failure state in the transition 
+ * table of a DFA.
+ */
+#define F -1 
+
+
+/******************************************************************************
+ * DFA TYPES 
+ ******************************************************************************/
 
 /**
  * Contains an accepting string, which is NULL if non-accepting,
@@ -19,37 +43,37 @@ struct accept_t {
 
 
 /**
- * A DFA state comprises the machine state after a given set of transitions. 
- * 
- * @mark  : Used by make_dtran
- * @accept: Action if accepting state.
- * @anchor: Anchor point if accepting state.
- * @set   : Set of NFA states represented by this DFA state.
+ * dfa_state
+ * `````````
+ * A DFA state comprises the machine state after a given set 
+ * of transitions. 
  */
 struct dfa_state {
         int id;
-        bool mark; 
-        char *accept;   
-        int anchor;
-        struct set_t *bitset;
+        bool mark;            // Used by make_dtran.
+        char *accept;         // Action if the state is accepting.
+        int anchor;           // Anchor point for accept.
+        struct set_t *bitset; // Set of NFA states in this DFA state.
 };
 
 
 /**
- * A deterministic finite automaton.
- *
- * @state     : Array of DFA state nodes.
- * @prev_state: Previous state node.
+ * dfa_t
+ * `````
+ * The actual DFA object. 
  */
 struct dfa_t {
-        struct dfa_state *start;
-        struct dfa_state **state;
-        int **trans;
+        struct dfa_state *start;  // DFA start state. 
+        struct dfa_state **state; // Array of DFA states.
+        int **trans;              // Transitions between states.
         int n;
         int max;
 };
 
 
+/******************************************************************************
+ * DFA FUNCTIONS 
+ ******************************************************************************/
 
 struct dfa_t *do_build(struct pgen_t *pgen, struct accept_t **accept);
 

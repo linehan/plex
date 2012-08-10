@@ -55,7 +55,6 @@ void flex(struct pgen_t *pgen)
  *
  * @input : input file.
  * @output: output file.
- *
  */
 void do_pgen(FILE *input, FILE *output)
 {

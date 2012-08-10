@@ -2,33 +2,40 @@
 #define _NFA_H 
 
 #include "lib/set.h"
+#include "lex.h"
 
-/*
- * An nfa_t is the non-deterministic finite automaton (NFA) produced
- * in the Thompson construction.
- */
-/*
- * Maximum number of NFA states in a single machine.
- * NFA_MAX * sizeof(struct nfa_t *) can't exceed 64k.
+
+/******************************************************************************
+ * CONSTANTS AND CODED CHARACTERS
+ ******************************************************************************/
+
+/* 
+ * Maximum number of states in a 
+ * single finite state machine. 
  */
 #define NFA_MAX 512 
 
-/* Non-character edge values */
-#define EPSILON -1
-#define CCL     -2
-#define EMPTY   -3
-
-/* Anchor field values (e.g. regex $, ^) */
-#define NONE  0
-#define START 1
-#define END   2
-#define BOTH  (START | END)
-
-/* Total space that can be used by the accept strings. */
+/* 
+ * Total space that can be used by the 
+ * accept strings. 
+ */
 #define STR_MAX (10 * 1024)     
 
 
+/******************************************************************************
+ * NFA TYPES 
+ ******************************************************************************/
 
+/**
+ * NFA State
+ * `````````
+ * The finite state machine is composed of a set of states 
+ * (or nodes) which are connected according to transitions
+ * which occur given some input symbol.
+ *
+ * This datatype represents such a state, and is organized
+ * further by the main NFA datatype.
+ */
 struct nfa_state {
         int id;
         int   edge;               // Edge label: char, CCL, EMPTY, or EPSILON.
@@ -40,6 +47,13 @@ struct nfa_state {
 };
 
 
+/**
+ * NFA
+ * ```
+ * The actual automaton, containing a start state, a set of
+ * NFA states, and book-keeping values for the total number
+ * of states and the maximum allowable states of the machine.
+ */
 struct nfa_t {
         struct nfa_state *start;   // Address of start state.
         struct nfa_state **state;  // State array.
@@ -50,9 +64,9 @@ struct nfa_t {
 
 
 
-
-
-
+/******************************************************************************
+ * NFA FUNCTIONS 
+ ******************************************************************************/
 
 struct nfa_t *          new_nfa(int max);
 struct nfa_state *new_nfa_state(struct nfa_t *nfa);

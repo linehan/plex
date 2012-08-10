@@ -357,7 +357,6 @@ struct nfa_state *rule(struct lexer_t *lex)
  *      while(match(OR))
  *              cat_expr
  *              do the OR
- *
  */
 void expr(struct lexer_t *lex, struct nfa_state **startp, struct nfa_state **endp)
 {

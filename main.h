@@ -25,7 +25,6 @@
  * @cur     : pointer for traversing the line.
  * @in      : input file stream
  * @out     : output file stream
- *
  */
 struct pgen_t {
         char path_in[PATHSIZE];

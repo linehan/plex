@@ -205,7 +205,6 @@ struct nfa_state *e_closure(struct nfa_t *nfa, struct set_t *input)
 
                 /* If state is accepting, save it. */
 	        if (p->accept && (i < accept_num)) {
-                        printf("LOOK: %s\n", p->accept);
                         accept_num = i;
                         accept     = p;
 	        }
