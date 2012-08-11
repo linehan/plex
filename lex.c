@@ -29,6 +29,11 @@
  *
  *****************************************************************************/
 
+/******************************************************************************
+ * CONFIGURATION 
+ ******************************************************************************/
+#define LEXER_DEBUG 0
+
 
 /******************************************************************************
  * FORWARD REFERENCES 
@@ -106,12 +111,6 @@ void machine(struct lexer_t *lex)
                 state->next2 = new_nfa_state(lex->nfa);
                 state        = state->next2;
                 state->next  = rule(lex);
-        }
-
-        int i;
-        for (i=0; i<lex->nfa->n; i++) {
-                if (lex->nfa->state[i]->accept)
-                        printf("LOOK: %s\n", lex->nfa->state[i]->accept);
         }
 
         __LEAVE;
@@ -249,7 +248,9 @@ enum token_t advance(struct lexer_t *lex)
 
         lex->token = (in_quote || saw_escape) ? L : TOKEN_MAP[lex->lexeme];
 
+        #if LEXER_DEBUG
         printf("lexeme: %c token: %d\n", lex->lexeme, TOKEN_MAP[lex->lexeme]);
+        #endif
 
         exit:
                 __LEAVE;

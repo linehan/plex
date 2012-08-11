@@ -14,6 +14,7 @@ SOURCES=main.c          \
         lib/set.c       \
         lib/textutils.c \
         lib/debug.c     \
+        input.c         \
         scan.c          \
         lex.c           \
         macro.c         \

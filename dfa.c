@@ -20,6 +20,10 @@ int                  in_dstates(struct dfa_t *dfa, struct set_t *nfa_set);
 struct dfa_state * get_unmarked(struct dfa_t *dfa);
 
 
+/******************************************************************************
+ * DFA ALLOCATION, CONSTRUCTION, DESTRUCTION
+ ******************************************************************************/
+
 /**
  * new_dfa
  * ```````
@@ -94,6 +98,11 @@ struct dfa_state *new_dfa_state(struct dfa_t *dfa)
 }
 
 
+/******************************************************************************
+ * NFA-DFA INTERACTIONS 
+ ******************************************************************************/
+
+
 /**
  * add_to_dstates
  * ``````````````
@@ -119,7 +128,7 @@ int add_to_dstates(struct dfa_t *dfa, struct set_t *nfa_set, struct nfa_state *s
 
         __LEAVE;
 
-	return dfa->n;
+	return d->id;
 }
 
 
@@ -205,6 +214,9 @@ struct accept_t *accept_states(struct dfa_t *dfa)
 }
 
 
+/******************************************************************************
+ * ACCESS FUNCTIONS 
+ ******************************************************************************/
 
 /**
  * do_build 
@@ -232,9 +244,6 @@ struct dfa_t *do_build(struct pgen_t *pgen, struct accept_t **accept)
         *accept = accept_states(dfa);
 
         __LEAVE;
-
-        print_nfa(nfa);
-        printf("\n\n");
 
         return dfa;
 }
@@ -275,8 +284,6 @@ void subset(struct dfa_t *dfa, struct nfa_t *nfa)
 
 	                if ((nfa_set = move(nfa, current->bitset, c))) {
 		                accept = e_closure(nfa, nfa_set);
-                                if (accept && accept->accept)
-                                        printf("LOOK: %s\n", accept->accept);
                         }
 
 	                if (!nfa_set) 

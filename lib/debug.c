@@ -70,7 +70,7 @@ struct error_info e[] = {
  * NOTE
  * err() does not interrupt program execution.
  */
-int err(int number)
+int set_errno(int number)
 {
         errno = number;
         return -1;

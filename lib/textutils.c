@@ -749,7 +749,7 @@ ssize_t getstr(char **buf, size_t *len, FILE *stream)
         int i=0;
 
         if (!buf || !len) 
-                return err(EINVAL);
+                return set_errno(EINVAL);
 
         if (*buf == NULL || *len == 0) {
                 *buf = NULL;

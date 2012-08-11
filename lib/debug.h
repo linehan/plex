@@ -1,3 +1,4 @@
+
 #ifndef _DEBUG_H
 #define _DEBUG_H
 #include <errno.h>
@@ -15,9 +16,17 @@
 /*
  * Raise a signal and print an error.
  */
+
 #define halt(sig, ...)                                                       \
         (NUM_ARGS(__VA_ARGS__) == 1) ? raise_report(sig, __VA_ARGS__, "") \
                                      : raise_report(sig, __VA_ARGS__)
+
+
+#define _e_internal(fmt, ...) do {                                          \
+        halt(SIGABRT, "INTERNAL ERROR in %s: " fmt, __func__, __VA_ARGS__); \
+} while(0)
+
+#define e_internal(...) _e_internal(__VA_ARGS__, "")
 
 
 
@@ -67,7 +76,7 @@ int raise_report(int signo, const char *fmt, ...);
 typedef void (*sig_handler_t)(int signo);
 void sigreg(sig_handler_t handler);
 
-int err(int number);
+int set_errno(int number);
 
 
 #endif

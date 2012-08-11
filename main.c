@@ -31,18 +31,7 @@ void flex(struct pgen_t *pgen)
         /* Construct the DFA */
         dfa = do_build(pgen, &accept);
 
-        /* Print the DFA transition table to the output stream. */
-        fprintf(pgen->out,
-                "YYPRIVATE YY_TTYPE  %s[%d][%d] =\n", 
-                DTRAN_NAME, dfa->n, dfa->max);
-
-        /* Print the DFA array to the output stream. */
-	print_array(pgen->out, dfa->trans, dfa->n, MAX_CHARS);
-
-	defnext(pgen->out, DTRAN_NAME);
-
-        /* Print the rest of the driver and everyting after the second %% */
-	pdriver(pgen->out, dfa->n, accept);	
+        print_driver(pgen, dfa, accept);
 
 	scan_tail(pgen);
 }

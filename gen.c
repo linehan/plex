@@ -4,6 +4,7 @@
 #include "nfa.h"
 #include "dfa.h"
 #include "main.h"
+#include "gen.h"
 
 /*
  *
@@ -11,17 +12,55 @@
  *
  */
 
+
+
+
+
+enum driver_mode { DRIVER_HEADER, DRIVER_TOP, DRIVER_BOTTOM };
+
+/**
+ * driver 
+ * ``````
+ */
+void driver(FILE *output, enum driver_mode mode)
+{
+        const char *suspend[3] = 
+        {
+                "/* ---- TRANSITION MATRICES INSERTED HERE ---- */",
+                "/* ---- CASE STATEMENTS INSERTED HERE ---- */",
+                "3552j2kl1kjf;l"
+        };
+
+        #define STOP_POINT suspend[mode]
+
+        static FILE *input;
+        char line[4096];
+
+        if (!input) {
+                input = fopen("./driver/driver.c", "r");
+        }
+
+        while ((fgets(line, 4096, input))) {
+
+                if ((strstr(line, STOP_POINT)))
+                        break;
+                else
+                        fputs(line, output);
+        }
+}
+
+
 /**
  * pheader
  * ```````
  * Print out a header comment that describes the uncompressed DFA.
  *
- * @fp: output stream
+ * @out: output stream
  * @dtran: DFA transition table
  * @nrows: Number of states in dtran[]
  * @accept: set of accept states in dtran[]
  */
-void pheader(FILE *fp, int **dtran, int nrows, struct accept_t *accept)
+void pheader(FILE *out, int **dtran, int nrows, struct accept_t *accept)
 {
         int last_transition;
         int chars_printed = 0;
@@ -29,22 +68,22 @@ void pheader(FILE *fp, int **dtran, int nrows, struct accept_t *accept)
         int i;
         int j;
 
-        fprintf(fp, "#ifdef __NEVER__\n" );
-        fprintf(fp, "/*---------------------------------------------------\n");
-        fprintf(fp, " * DFA (start state is 0) is:\n *\n" );
+        fprintf(out, "#ifdef __NEVER__\n" );
+        fprintf(out, "/*---------------------------------------------------\n");
+        fprintf(out, " * DFA (start state is 0) is:\n *\n" );
 
         for (i=0; i<nrows; i++) {
 	        if (!accept[i].string) {
-	                fprintf(fp, " * State %d [nonaccepting]", i);
+	                fprintf(out, " * State %d [nonaccepting]", i);
                 } else {
-	                fprintf(fp, " * State %d [accepting, line %d <",
+	                fprintf(out, " * State %d [accepting, line %d <",
 				    i , ((int *)(accept[i].string))[-1]);
 
-	                esc_fputs(accept[i].string, 20, fp);
-	                fprintf(fp, ">]");
+	                esc_fputs(accept[i].string, 20, out);
+	                fprintf(out, ">]");
 
                         if (accept[i].anchor)
-                                fprintf(fp, " Anchor: %s%s",
+                                fprintf(out, " Anchor: %s%s",
                                             accept[i].anchor & START ? "start " : "",
                                             accept[i].anchor & END   ? "end"    : "");
 	        }
@@ -54,23 +93,23 @@ void pheader(FILE *fp, int **dtran, int nrows, struct accept_t *accept)
 	        for (j=0; j<MAX_CHARS; j++) {
 	                if (dtran[i][j] != F) {
 		                if (dtran[i][j] != last_transition) {
-		                        fprintf(fp, "\n *    goto %2d on ", dtran[i][j]);
+		                        fprintf(out, "\n *    goto %2d on ", dtran[i][j]);
 		                        chars_printed = 0;
 		                }
-		                fprintf(fp, "%s", bin_to_ascii(j,1) );
+		                fprintf(out, "%s", bin_to_ascii(j,1) );
 
 		                if ((chars_printed += strlen(bin_to_ascii(j,1))) > 56) {
-		                        fprintf(fp, "\n *               ");
+		                        fprintf(out, "\n *               ");
 		                        chars_printed = 0;
 		                }
 
 		                last_transition = dtran[i][j];
 	                }
 	        }
-	        fprintf(fp, "\n");
+	        fprintf(out, "\n");
         }
-        fprintf(fp," */\n\n");
-        fprintf(fp,"#endif\n");
+        fprintf(out," */\n\n");
+        fprintf(out,"#endif\n");
 }
 
 
@@ -98,7 +137,7 @@ void pdriver(FILE *output, int nrows, struct accept_t *accept)
                 " *\t 3 = both\n"
                 " *\t 4 = neither\n"
                 " */\n"
-                "YYPRIVATE YY_TYPE Yyaccept[] = \n");
+                "YYPRIVATE YY_TTYPE Yyaccept[] = \n");
         fprintf(output, "{\n");
 
         /* Print the array of accepting states */
@@ -108,24 +147,23 @@ void pdriver(FILE *output, int nrows, struct accept_t *accept)
 	        else
 	                fprintf(output, "\t%-3d", accept[i].anchor ? accept[i].anchor :4);
 
-	        fprintf(output, "%c    /* State %-3d */\n", i == (nrows -1) ? ' ' : ',' , i);
+	        fprintf(output, "%c  /* State %-3d */\n", i == (nrows -1) ? ' ' : ',' , i);
         }
         fprintf(output, "};\n\n");
 
         /* Print code above case statements */
-        //driver_2(output, 0);	
+        driver(output, DRIVER_TOP);	
 
         /* Print case statements */
         for (i=0; i<nrows; i++) {
 	        if (accept[i].string) {
-	                fprintf(output, "\t\tcase %d:\t\t\t\t\t/* State %-3d */\n",i,i);
-
-	                fprintf(output, "\t\t    %s\n",    accept[i].string);
-	                fprintf(output, "\t\t    break;\n");
+	                fprintf(output, "\t\t\t\t\tcase %d: /* State %-3d */\n",i,i);
+	                fprintf(output, "\t\t\t\t\t\t%s\n", accept[i].string);
+	                fprintf(output, "\t\t\t\t\t\tbreak;\n");
 	        }
         }
         /* Code below cases. */
-        //driver_2(output, !NOLINE);
+        driver(output, DRIVER_BOTTOM);
 }
 
 
@@ -144,12 +182,12 @@ void pdriver(FILE *output, int nrows, struct accept_t *accept)
 void print_array(FILE *fp, int **array, int nrows, int ncols)
 {
         #define NCOLS 10 // Num. columns used to print arrays
-        int j; // Output column.
+        int j;           // Output column.
         int i;
 
         fprintf(fp, "{\n");
 
-        for(i=0; i<nrows; i++) {
+        for (i=0; i<nrows; i++) {
 	        fprintf(fp, "/* %02d */  { ", i);
 
 	        for (j=0; j<ncols; j++) {
@@ -187,4 +225,23 @@ void defnext(FILE *fp, char *name)
                     "#define yy_next(state, c) %s[state][c]\n", name);
 }
 
+
+
+void print_driver(struct pgen_t *pgen, struct dfa_t *dfa, struct accept_t *accept)
+{
+        driver(pgen->out, DRIVER_HEADER);
+
+        /* Print the DFA transition table to the output stream. */
+        fprintf(pgen->out,
+                "YYPRIVATE YY_TTYPE  %s[%d][%d] =\n", 
+                DTRAN_NAME, dfa->n, dfa->max);
+
+        /* Print the DFA array to the output stream. */
+	print_array(pgen->out, dfa->trans, dfa->n, MAX_CHARS);
+
+	defnext(pgen->out, DTRAN_NAME);
+
+        /* Print the rest of the driver and everyting after the second %% */
+	pdriver(pgen->out, dfa->n, accept);	
+}
 
