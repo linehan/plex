@@ -34,7 +34,7 @@ void driver(FILE *output, enum driver_mode mode)
         char line[4096];
 
         if (!input) {
-                input = fopen("driver.c", "r");
+                input = fopen("/home/linehan/src/mine/plex/src/driver.c", "r");
         }
 
         while ((fgets(line, 4096, input))) {

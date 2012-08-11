@@ -54,6 +54,7 @@
 #define __DEBUG(N, ...) DEBUG_ ## N(__VA_ARGS__) // N ->  1
 #define  _DEBUG(N, ...) __DEBUG(N, __VA_ARGS__)  // N -> (1)
 
+#define NO_DEBUG
 
 #if defined(NO_DEBUG)
 #define DEBUG(...) /* nothing */
