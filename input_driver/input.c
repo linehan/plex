@@ -3,8 +3,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
-#include "lib/debug.h"
 #include "input.h"
 
 /******************************************************************************
@@ -81,6 +81,9 @@ int  Termchar = 0;
  * for characters to still be in the input buffer.
  */
 int Eof_read = 0;
+
+
+#define min(x, y) (x < y) ? x : y
 
 
 /******************************************************************************
@@ -179,8 +182,9 @@ unsigned char *io_mark_start(void)
 unsigned char *io_mark_end(void)
 {
         Mline = Lineno;
+        eMark = Next;
 
-        return (eMark = Next);
+        return eMark;
 }
 
 
@@ -196,8 +200,9 @@ unsigned char *io_move_start(void)
 unsigned char *io_to_mark(void)
 {
         Lineno = Mline;
+        Next   = eMark;
 
-        return (Next = eMark);
+        return Next;
 }
 
 
@@ -215,7 +220,7 @@ unsigned char *io_to_mark(void)
  */
 unsigned char *io_mark_prev(void)
 {
-        pMark = sMark;
+        pMark   = sMark;
         pLineno = Lineno;
         pLength = eMark - sMark;
 
@@ -248,7 +253,7 @@ int io_advance(void)
          * anchor will work on the first input line.
          */
         if (!been_called) {
-                Next = sMark = eMark = END - 1;
+                Next = sMark = eMark = (END-1);
                 *Next = '\n';
                 --Lineno;
                 --Mline;
@@ -258,7 +263,7 @@ int io_advance(void)
         if (NO_MORE_CHARS)
                 return 0;
 
-        if (!Eof_read && io_flush(false) < 0)
+        if (!Eof_read && (io_flush(false) < 0))
                 return -1;
 
         if (*Next == '\n')
@@ -336,8 +341,11 @@ int io_flush(bool force)
                 copy_amt = End_buf - left_edge;
                 memcpy(Start_buf, left_edge, copy_amt);
 
-                if (!io_fillbuf(Start_buf + copy_amt))
-                        e_internal("Buffer full, can't read.\n");
+                if (!(io_fillbuf(Start_buf + copy_amt))) {
+                        fprintf(stderr, "INTERNAL ERROR in io_flush: "
+                                        "Buffer full, can't read.\n");
+                        raise(SIGABRT);
+                }
 
                 if (pMark)
                         pMark -= shift_amt;
@@ -373,14 +381,21 @@ int io_fillbuf(unsigned char *starting_at)
 
         need = ((END - starting_at) / MAXLEX) * MAXLEX;
 
-        if (need < 0)
-                e_internal("Bad read-request starting addr.\n");
+        if (need < 0) {
+                fprintf(stderr, "INTERNAL ERROR in io_fillbuf: "
+                                "Bad read-request starting addr.\n");
+                raise(SIGABRT);
+        }
 
-        if (need == 0)
+        if (need == 0) {
                 return 0;
+        }
 
-        if ((got = read(Inp_file, starting_at, need)) == -1)
-                e_internal("Can't read input file.\n");
+        if ((got = read(Inp_file, starting_at, need)) == -1) {
+                fprintf(stderr, "INTERNAL ERROR in io_fillbuf: "
+                                "Can't read input file.\n");
+                raise(SIGABRT);
+        }
 
         End_buf = starting_at + got;
 
@@ -479,11 +494,9 @@ void io_unput(int c)
 {
         if (Termchar) {
                 io_unterm();
-
                 if (io_pushback(1)) {
                         *Next = c;
                 }
-
                 io_term();
         } else {
                 if (io_pushback(1)) {

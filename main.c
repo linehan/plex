@@ -8,7 +8,6 @@
 #include "lib/debug.h"
 #include "lib/textutils.h"
 #include "lib/file.h"
-#include "lib/redblack.h"
 #include "scan.h"
 #include "nfa.h"
 #include "dfa.h"
@@ -66,10 +65,15 @@ int main(int argc, char *argv[])
 {
         FILE *input_file = NULL;
         FILE *output_file = NULL;
+        char buf[1024];
         int c;
 
-        while ((c = getopt(argc, argv, "i:o:")) != -1) {
+        while ((c = getopt(argc, argv, "m:i:o:")) != -1) {
                 switch (c) {
+                case 'm':
+                        sprintf(buf, "gcc -static %s -L. -linput -o y.out", optarg);
+                        system(buf);
+                        return 0;
                 case 'i':
                         input_file = sfopen(optarg, "r");
                         break;

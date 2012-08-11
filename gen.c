@@ -13,9 +13,6 @@
  */
 
 
-
-
-
 enum driver_mode { DRIVER_HEADER, DRIVER_TOP, DRIVER_BOTTOM };
 
 /**
@@ -37,7 +34,7 @@ void driver(FILE *output, enum driver_mode mode)
         char line[4096];
 
         if (!input) {
-                input = fopen("./driver/driver.c", "r");
+                input = fopen("driver.c", "r");
         }
 
         while ((fgets(line, 4096, input))) {
