@@ -8,7 +8,7 @@
  ******************************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
-#include "input.h"
+#include <stdbool.h>
 
 /******************************************************************************
  * Global variables and settings
@@ -18,7 +18,7 @@ typedef unsigned char YY_TTYPE;
 #define YYF ((YY_TTYPE)(-1))
 #define YYPRIVATE static
 
-char *yytext; /* Pointer to lexeme. */
+unsigned char *yytext; /* Pointer to lexeme. */
 int yylen;    /* Length of lexeme. */
 int yylineno; /* Input line number. */
 
@@ -104,7 +104,7 @@ void yylex(void)
                                         yynstate = YYF;
                                         break;
                                 } else if (true) {
-                                        yytext = "";
+                                        yytext = (unsigned char *)"";
                                         yylen  = 0;
                                         return;
                                 } else {

@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
                         input_file = sfopen(optarg, "r");
                         break;
                 case 'm':
-                        sprintf(buf, "gcc -static %s -L. -linput -o y.out", optarg);
+                        sprintf(buf, "gcc -static %s -L/usr/local/bin -linput -o y.out", optarg);
                         system(buf);
                         return 0;
                 case 'o':
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
         }
 
         if (!input_file)
-                halt(SIGABRT, "Missing input (-i <INPUT>)\n");
+                halt(SIGABRT, "Not a valid input file.\n");
 
         if (!output_file)
                 output_file = stdout; 
